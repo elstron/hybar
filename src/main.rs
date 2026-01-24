@@ -85,18 +85,14 @@ async fn main() {
             container: section_container,
         } = create_sections();
 
-        // Use Rc to share sections without cloning
         let section_left = Rc::new(section_left);
         let section_center = Rc::new(section_center);
         let section_right = Rc::new(section_right);
 
         let (tx, _) = tokio::sync::broadcast::channel(128);
-        
-        // Centralized window state management
-        // When autohide is false: window visible = true
-        // When autohide is true: window starts hidden = false
+
         let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
-        
+
         // Only create receivers for widgets that need them
         for widget in user_config.sections.right.iter() {
             let rx = if widget_needs_receiver(widget) {
@@ -104,7 +100,13 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_right, &user_config, rx, Rc::clone(&is_window_visible));
+            get_widget(
+                widget,
+                &section_right,
+                &user_config,
+                rx,
+                Rc::clone(&is_window_visible),
+            );
         }
 
         for widget in user_config.sections.center.iter() {
@@ -113,7 +115,13 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_center, &user_config, rx, Rc::clone(&is_window_visible));
+            get_widget(
+                widget,
+                &section_center,
+                &user_config,
+                rx,
+                Rc::clone(&is_window_visible),
+            );
         }
 
         for widget in user_config.sections.left.iter() {
@@ -122,7 +130,13 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_left, &user_config, rx, Rc::clone(&is_window_visible));
+            get_widget(
+                widget,
+                &section_left,
+                &user_config,
+                rx,
+                Rc::clone(&is_window_visible),
+            );
         }
         let tx_clone = tx.clone();
         glib::MainContext::default().spawn_local(async move {
@@ -142,7 +156,8 @@ async fn main() {
                             let is_workspace_change =
                                 line.contains("\"change\":") || line.contains("workspace");
                             let is_title_change = line.contains("activewindow>>");
-                            let is_fullscreen_change = line.contains("fullscreen") && line.contains("1");
+                            let is_fullscreen_change =
+                                line.contains("fullscreen") && line.contains("1");
 
                             if is_workspace_change {
                                 tx_clone.send(Events::WorkspaceChange(line.clone())).ok();
@@ -162,6 +177,7 @@ async fn main() {
                                 }
                                 continue;
                             }
+                            continue;
                         }
                     }
                     Err(e) => {
@@ -171,31 +187,26 @@ async fn main() {
             }
         });
 
-        section_container.append(&section_left.as_ref());
-        section_container.append(&section_center.as_ref());
-        section_container.append(&section_right.as_ref());
+        section_container.append(section_left.as_ref());
+        section_container.append(section_center.as_ref());
+        section_container.append(section_right.as_ref());
         window.set_child(Some(&section_container));
 
-        let motion_controller_for_normal_window = layer_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
+        let motion_controller_for_normal_window =
+            layer_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
         let motion_controller_for_hidden_window =
             hidden_bar_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
 
         println!("Autohide: {:?}", user_config.bar);
-        
-        // Improved fullscreen event handler
+
         let mut rx = tx.subscribe();
         glib::MainContext::default().spawn_local(async move {
             while let Ok(event) = rx.recv().await {
                 match event {
                     Events::FullscreenChange() => {
-                        println!("Fullscreen event received");
                         // TODO: Implement auto-hide logic for fullscreen
-                        // For now, just log the event and continue processing
                     }
-                    _ => {
-                        // Continue processing other events instead of terminating
-                        continue;
-                    }
+                    _ => continue,
                 }
             }
         });
@@ -290,25 +301,19 @@ pub fn get_widget(
         }
         "clock" => {
             println!("Agregando widget de reloj");
-            let clock_label = gtk::Label::new(Some(
-                Local::now().format("%I:%M:%S %P").to_string().as_str(),
-            ));
+            let clock_label =
+                gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
 
             container.append(&clock_label);
 
             let clock_label = Rc::new(clock_label);
-            // Optimize clock updates: only update when window is visible
-            // Note: The timer continues to fire every second, but we skip the update
-            // when the window is hidden. This trades consistent CPU wake-ups for simpler logic.
-            // The overhead of checking a Cell<bool> is negligible (nanoseconds), while
-            // stopping/restarting timers would require complex state management.
-            glib::timeout_add_local(std::time::Duration::from_secs(1), {
+            glib::timeout_add_local(std::time::Duration::from_secs(60), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {
                     // Only update the clock if the window is visible
                     if is_visible.get() {
                         let now = chrono::Local::now();
-                        clock_label.set_label(&now.format("%I:%M:%S %P").to_string());
+                        clock_label.set_label(&now.format("%I:%M %P").to_string());
                     }
                     ControlFlow::Continue
                 }
@@ -339,7 +344,6 @@ pub fn get_widget(
     }
 }
 
-/// Determines if a widget needs an event receiver
 fn widget_needs_receiver(widget_name: &str) -> bool {
     matches!(widget_name, "workspaces" | "title")
 }

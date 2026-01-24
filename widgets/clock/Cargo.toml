@@ -1,0 +1,11 @@
+[package]
+name = "clock"
+version = "0.1.0"
+edition = "2021"
+
+[lib] # Importante: es una librería
+path = "src/lib.rs"
+
+[dependencies]
+muelle-core = { path = "../../muelle-core" }
+chrono = "0.4.41"

@@ -1,0 +1,8 @@
+{
+  "widgets": [
+    { "name": "config", "priority": 1 },
+    { "name": "clock", "priority": 2 },
+    { "name": "calendar", "priority": 3 },
+    { "name": "apps", "priority": 4 }
+  ]
+}

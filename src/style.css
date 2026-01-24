@@ -1,0 +1,47 @@
+
+.top-bar {
+  background: #15141b;
+  margin-top: 0;
+}
+
+.hidden-bar {
+  background: black;
+}
+
+
+.section-container {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.section-center {
+  padding: 0 20px;
+}
+
+.workspace,
+.workspace-active {
+  padding: 5px;
+  margin: 0 5px;
+  font-size: 10px;
+  background-color: transparent;
+  transition: background-color 0.8s ease;
+  cursor: pointer;
+}
+.workspace-active {
+  color: #ffffff;
+  font-weight: bold;
+  transition: color 0.8s ease;
+}
+.workspace:hover {
+  color: #e46c6c;
+}
+
+.workspace-active {
+  border: none;
+  color: #e46c6c;
+}
+
+.separator {
+  margin: 0 10px;
+  color: #555555;
+}

@@ -1,0 +1,27 @@
+[package]
+name = "muelle"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clock = { path = "widgets/clock" }
+gtk = { version = "0.9", package = "gtk4" }
+gtk4-layer-shell = "0.5.0"
+glib = "0.20.12"
+chrono = "0.4.41"
+serde_json = "1.0.140"
+serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+futures = "0.3"
+muelle-core = { path = "muelle-core" }
+async-trait = "0.1.88"
+toml = "0.8"
+dirs-next = "2"
+[workspace]
+members = [
+  "muelle-core",
+  "widgets/clock",
+  #"apps/calendario",
+  # "apps/settings"
+]

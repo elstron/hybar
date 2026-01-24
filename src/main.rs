@@ -22,6 +22,8 @@ use crate::user::models::UserConfig;
 use crate::widgets::workspaces::update_workspaces;
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
+// Hyprland socket subscription message
+const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 
 #[derive(Deserialize)]
 struct WidgetConfig {
@@ -95,7 +97,7 @@ async fn main() {
         
         // Only create receivers for widgets that need them
         for widget in user_config.sections.right.iter() {
-            let rx = if widget == "workspaces" || widget == "title" {
+            let rx = if widget_needs_receiver(widget) {
                 Some(tx.subscribe())
             } else {
                 None
@@ -104,7 +106,7 @@ async fn main() {
         }
 
         for widget in user_config.sections.center.iter() {
-            let rx = if widget == "workspaces" || widget == "title" {
+            let rx = if widget_needs_receiver(widget) {
                 Some(tx.subscribe())
             } else {
                 None
@@ -113,7 +115,7 @@ async fn main() {
         }
 
         for widget in user_config.sections.left.iter() {
-            let rx = if widget == "workspaces" || widget == "title" {
+            let rx = if widget_needs_receiver(widget) {
                 Some(tx.subscribe())
             } else {
                 None
@@ -125,8 +127,7 @@ async fn main() {
             if let Some(path) = get_hypr_socket_path() {
                 match UnixStream::connect(path).await {
                     Ok(mut stream) => {
-                        let sub = r#"["subscribe", ["workspace", "fullscreen"]]"#;
-                        if let Err(e) = stream.write_all(sub.as_bytes()).await {
+                        if let Err(e) = stream.write_all(HYPRLAND_SUBSCRIPTION.as_bytes()).await {
                             eprintln!("Failed to subscribe to Hyprland events: {}", e);
                             return;
                         }
@@ -334,6 +335,12 @@ pub fn get_widget(
         }
     }
 }
+
+/// Determines if a widget needs an event receiver
+fn widget_needs_receiver(widget_name: &str) -> bool {
+    matches!(widget_name, "workspaces" | "title")
+}
+
 fn create_sections() -> BarSections {
     let section_left = gtk::Box::new(Orientation::Horizontal, 0);
     section_left.set_halign(gtk::Align::Start);

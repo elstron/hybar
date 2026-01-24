@@ -92,7 +92,9 @@ async fn main() {
 
         let (tx, _) = tokio::sync::broadcast::channel(128);
         
-        // Centralized window state management  
+        // Centralized window state management
+        // When autohide is false: window visible = true
+        // When autohide is true: window starts hidden = false
         let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
         
         // Only create receivers for widgets that need them
@@ -181,9 +183,6 @@ async fn main() {
         println!("Autohide: {:?}", user_config.bar);
         
         // Improved fullscreen event handler
-        let window_clone = window.clone();
-        let hidden_window_clone = hidden_window.clone();
-        let is_autohide = user_config.bar.autohide;
         let mut rx = tx.subscribe();
         glib::MainContext::default().spawn_local(async move {
             while let Ok(event) = rx.recv().await {
@@ -299,9 +298,10 @@ pub fn get_widget(
 
             let clock_label = Rc::new(clock_label);
             // Optimize clock updates: only update when window is visible
-            // Note: We keep the timer running but skip updates when hidden.
-            // This is more efficient than stopping/restarting the timer,
-            // as checking a boolean is extremely cheap (single memory read).
+            // Note: The timer continues to fire every second, but we skip the update
+            // when the window is hidden. This trades consistent CPU wake-ups for simpler logic.
+            // The overhead of checking a Cell<bool> is negligible (nanoseconds), while
+            // stopping/restarting timers would require complex state management.
             glib::timeout_add_local(std::time::Duration::from_secs(1), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {

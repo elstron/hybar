@@ -1,6 +1,6 @@
 use glib::ControlFlow::{self, Continue};
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Button, Orientation};
+use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation};
 use gtk4_layer_shell::LayerShell;
 mod config;
 mod utils;
@@ -10,6 +10,7 @@ use serde::Deserialize;
 use utils::css::load_css;
 mod user;
 use chrono::Local;
+use std::cell::Cell;
 use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -32,7 +33,7 @@ pub struct ConfigFile {
     widgets: Vec<WidgetConfig>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BarSections {
     left: GtkBox,
     right: GtkBox,
@@ -82,68 +83,91 @@ async fn main() {
             container: section_container,
         } = create_sections();
 
-        let section_left_clone = section_left.clone();
-        let section_center_clone = section_center.clone();
-        let section_right_clone = section_right.clone();
+        // Use Rc to share sections without cloning
+        let section_left = Rc::new(section_left);
+        let section_center = Rc::new(section_center);
+        let section_right = Rc::new(section_right);
 
         let (tx, _) = tokio::sync::broadcast::channel(128);
+        
+        // Only create receivers for widgets that need them
         for widget in user_config.sections.right.iter() {
-            let rx = tx.subscribe();
-            get_widget(widget, &section_right_clone, &user_config, rx);
+            let rx = if widget == "workspaces" || widget == "title" {
+                Some(tx.subscribe())
+            } else {
+                None
+            };
+            get_widget(widget, &section_right, &user_config, rx);
         }
 
         for widget in user_config.sections.center.iter() {
-            let rx = tx.subscribe();
-            get_widget(widget, &section_center_clone, &user_config, rx);
+            let rx = if widget == "workspaces" || widget == "title" {
+                Some(tx.subscribe())
+            } else {
+                None
+            };
+            get_widget(widget, &section_center, &user_config, rx);
         }
 
         for widget in user_config.sections.left.iter() {
-            let rx = tx.subscribe();
-            get_widget(widget, &section_left_clone, &user_config, rx);
+            let rx = if widget == "workspaces" || widget == "title" {
+                Some(tx.subscribe())
+            } else {
+                None
+            };
+            get_widget(widget, &section_left, &user_config, rx);
         }
         let tx_clone = tx.clone();
         glib::MainContext::default().spawn_local(async move {
-            if let Some(path) = get_hypr_socket_path()
-                && let Ok(mut stream) = UnixStream::connect(path).await
-            {
-                let sub = r#"[\"subscribe\", [\"workspace\", \"fullscreen\"]]"#;
-                stream.write_all(sub.as_bytes()).await.unwrap();
-
-                let reader = BufReader::new(stream);
-                let mut lines = reader.lines();
-
-                while let Ok(Some(line)) = lines.next_line().await {
-                    println!("Received: {}", line);
-                    let is_workspace_change =
-                        line.contains("\"change\":") || line.contains("workspace");
-                    let is_title_change = line.contains("activewindow>>");
-                    let is_fullscreen_change = line.contains("fullscreen") && line.contains("1");
-
-                    if is_workspace_change {
-                        tx_clone.send(Events::WorkspaceChange(line.clone())).ok();
-                        continue;
-                    }
-
-                    if is_fullscreen_change {
-                        tx_clone.send(Events::FullscreenChange()).ok();
-                        continue;
-                    }
-
-                    if is_title_change {
-                        let parts: Vec<&str> = line.split(">>").collect();
-                        if parts.len() == 2 {
-                            let title = parts[1].trim().to_string();
-                            tx_clone.send(Events::TitleChange(title)).ok();
+            if let Some(path) = get_hypr_socket_path() {
+                match UnixStream::connect(path).await {
+                    Ok(mut stream) => {
+                        let sub = r#"["subscribe", ["workspace", "fullscreen"]]"#;
+                        if let Err(e) = stream.write_all(sub.as_bytes()).await {
+                            eprintln!("Failed to subscribe to Hyprland events: {}", e);
+                            return;
                         }
-                        continue;
+
+                        let reader = BufReader::new(stream);
+                        let mut lines = reader.lines();
+
+                        while let Ok(Some(line)) = lines.next_line().await {
+                            println!("Received: {}", line);
+                            let is_workspace_change =
+                                line.contains("\"change\":") || line.contains("workspace");
+                            let is_title_change = line.contains("activewindow>>");
+                            let is_fullscreen_change = line.contains("fullscreen") && line.contains("1");
+
+                            if is_workspace_change {
+                                tx_clone.send(Events::WorkspaceChange(line.clone())).ok();
+                                continue;
+                            }
+
+                            if is_fullscreen_change {
+                                tx_clone.send(Events::FullscreenChange()).ok();
+                                continue;
+                            }
+
+                            if is_title_change {
+                                let parts: Vec<&str> = line.split(">>").collect();
+                                if parts.len() == 2 {
+                                    let title = parts[1].trim().to_string();
+                                    tx_clone.send(Events::TitleChange(title)).ok();
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to connect to Hyprland socket: {}", e);
                     }
                 }
             }
         });
 
-        section_container.append(&section_left);
-        section_container.append(&section_center);
-        section_container.append(&section_right);
+        section_container.append(&section_left.as_ref());
+        section_container.append(&section_center.as_ref());
+        section_container.append(&section_right.as_ref());
         window.set_child(Some(&section_container));
 
         let motion_controller_for_normal_window = layer_motion_controller(&window, &hidden_window);
@@ -152,16 +176,26 @@ async fn main() {
 
         println!("Autohide: {:?}", user_config.bar);
 
-        //let window_clone = window.clone();
-        //let hidden_window_clone = hidden_window.clone();
+        // Centralized window state management
+        let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
+        
+        // Improved fullscreen event handler
+        let window_clone = window.clone();
+        let hidden_window_clone = hidden_window.clone();
+        let is_autohide = user_config.bar.autohide;
         let mut rx = tx.subscribe();
         glib::MainContext::default().spawn_local(async move {
             while let Ok(event) = rx.recv().await {
                 match event {
                     Events::FullscreenChange() => {
-                        println!("Evento de fullscreen recibido");
+                        println!("Fullscreen event received");
+                        // TODO: Implement auto-hide logic for fullscreen
+                        // For now, just log the event and continue processing
                     }
-                    _ => return,
+                    _ => {
+                        // Continue processing other events instead of terminating
+                        continue;
+                    }
                 }
             }
         });
@@ -221,9 +255,9 @@ pub fn hidden_bar_motion_controller(
 
 pub fn get_widget(
     name: &str,
-    container: &GtkBox,
+    container: &Rc<GtkBox>,
     config: &UserConfig,
-    mut rkv: tokio::sync::broadcast::Receiver<Events>,
+    rkv: Option<tokio::sync::broadcast::Receiver<Events>>,
 ) {
     match name {
         "separator" => {
@@ -233,18 +267,21 @@ pub fn get_widget(
             container.append(&separator);
         }
         "workspaces" => {
-            let container = container.clone();
-            update_workspaces(&container);
+            if let Some(mut rkv) = rkv {
+                let container = Rc::clone(container);
+                update_workspaces(&container);
 
-            let container_clone = container.clone();
-            glib::MainContext::default().spawn_local(async move {
-                while let Ok(event) = rkv.recv().await {
-                    match event {
-                        Events::WorkspaceChange(_) => update_workspaces(&container_clone),
-                        _ => println!("Evento no manejado en workspaces"),
+                glib::MainContext::default().spawn_local(async move {
+                    while let Ok(event) = rkv.recv().await {
+                        match event {
+                            Events::WorkspaceChange(_) => update_workspaces(&container),
+                            _ => continue,
+                        }
                     }
-                }
-            });
+                });
+            } else {
+                update_workspaces(container);
+            }
         }
         "clock" => {
             println!("Agregando widget de reloj");
@@ -255,6 +292,7 @@ pub fn get_widget(
             container.append(&clock_label);
 
             let clock_label = Rc::new(clock_label);
+            // Note: Clock visibility optimization could be added here with window state
             glib::timeout_add_local(std::time::Duration::from_secs(1), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {
@@ -267,17 +305,19 @@ pub fn get_widget(
         "title" => {
             let title_label = gtk::Label::new(Some("Titulo de ventana"));
 
-            let title_label_clone = title_label.clone();
-            glib::MainContext::default().spawn_local(async move {
-                while let Ok(event) = rkv.recv().await {
-                    match event {
-                        Events::TitleChange(new_title) => {
-                            title_label_clone.set_text(&new_title);
+            if let Some(mut rkv) = rkv {
+                let title_label_clone = title_label.clone();
+                glib::MainContext::default().spawn_local(async move {
+                    while let Ok(event) = rkv.recv().await {
+                        match event {
+                            Events::TitleChange(new_title) => {
+                                title_label_clone.set_text(&new_title);
+                            }
+                            _ => continue,
                         }
-                        _ => println!("Evento no manejado en title"),
                     }
-                }
-            });
+                });
+            }
 
             container.append(&title_label);
         }
@@ -286,31 +326,6 @@ pub fn get_widget(
         }
     }
 }
-fn create_button(label: &str, size: i32) -> Button {
-    let button = Button::with_label(label);
-    button.set_size_request(size, size);
-    button.set_vexpand(false);
-    button
-}
-
-fn create_button_with_animation(label: &str, size: i32, hover_size: i32) -> Button {
-    let button = create_button(label, size);
-    let motion_controller = gtk::EventControllerMotion::new();
-
-    let button_clone = button.clone();
-    motion_controller.connect_enter(move |_, _x, _y| {
-        button_clone.set_size_request(hover_size, hover_size);
-    });
-
-    let button_for_leave = button.clone();
-    motion_controller.connect_leave(move |_| {
-        button_for_leave.set_size_request(size, size); // Tamaño original
-    });
-
-    button.add_controller(motion_controller);
-    button
-}
-
 fn create_sections() -> BarSections {
     let section_left = gtk::Box::new(Orientation::Horizontal, 0);
     section_left.set_halign(gtk::Align::Start);

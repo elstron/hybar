@@ -299,6 +299,9 @@ pub fn get_widget(
 
             let clock_label = Rc::new(clock_label);
             // Optimize clock updates: only update when window is visible
+            // Note: We keep the timer running but skip updates when hidden.
+            // This is more efficient than stopping/restarting the timer,
+            // as checking a boolean is extremely cheap (single memory read).
             glib::timeout_add_local(std::time::Duration::from_secs(1), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {

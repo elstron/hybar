@@ -90,6 +90,9 @@ async fn main() {
 
         let (tx, _) = tokio::sync::broadcast::channel(128);
         
+        // Centralized window state management  
+        let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
+        
         // Only create receivers for widgets that need them
         for widget in user_config.sections.right.iter() {
             let rx = if widget == "workspaces" || widget == "title" {
@@ -97,7 +100,7 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_right, &user_config, rx);
+            get_widget(widget, &section_right, &user_config, rx, Rc::clone(&is_window_visible));
         }
 
         for widget in user_config.sections.center.iter() {
@@ -106,7 +109,7 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_center, &user_config, rx);
+            get_widget(widget, &section_center, &user_config, rx, Rc::clone(&is_window_visible));
         }
 
         for widget in user_config.sections.left.iter() {
@@ -115,7 +118,7 @@ async fn main() {
             } else {
                 None
             };
-            get_widget(widget, &section_left, &user_config, rx);
+            get_widget(widget, &section_left, &user_config, rx, Rc::clone(&is_window_visible));
         }
         let tx_clone = tx.clone();
         glib::MainContext::default().spawn_local(async move {
@@ -170,14 +173,11 @@ async fn main() {
         section_container.append(&section_right.as_ref());
         window.set_child(Some(&section_container));
 
-        let motion_controller_for_normal_window = layer_motion_controller(&window, &hidden_window);
+        let motion_controller_for_normal_window = layer_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
         let motion_controller_for_hidden_window =
-            hidden_bar_motion_controller(&window, &hidden_window);
+            hidden_bar_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
 
         println!("Autohide: {:?}", user_config.bar);
-
-        // Centralized window state management
-        let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
         
         // Improved fullscreen event handler
         let window_clone = window.clone();
@@ -215,12 +215,14 @@ async fn main() {
 pub fn layer_motion_controller(
     bar: &ApplicationWindow,
     hidden_bar: &ApplicationWindow,
+    is_visible: Rc<Cell<bool>>,
 ) -> gtk::EventControllerMotion {
     let motion_controller = gtk::EventControllerMotion::new();
 
     let bar_clone = bar.clone();
     let hidden_bar_clone_for_leave = hidden_bar.clone();
     motion_controller.connect_leave(move |_| {
+        is_visible.set(false);
         bar_clone.hide();
         bar_clone.set_focusable(false);
         let hidden_bar_clone = hidden_bar_clone_for_leave.clone();
@@ -236,6 +238,7 @@ pub fn layer_motion_controller(
 pub fn hidden_bar_motion_controller(
     bar: &ApplicationWindow,
     hidden_bar: &ApplicationWindow,
+    is_visible: Rc<Cell<bool>>,
 ) -> gtk::EventControllerMotion {
     bar.hide();
 
@@ -246,6 +249,7 @@ pub fn hidden_bar_motion_controller(
 
     motion_controller.connect_enter(move |_, _x, _y| {
         println!("Se entro en la zona de la barra oculta");
+        is_visible.set(true);
         hidden_bar_clone.set_focusable(false);
         bar_clone.present();
         bar_clone.set_focusable(true);
@@ -258,6 +262,7 @@ pub fn get_widget(
     container: &Rc<GtkBox>,
     config: &UserConfig,
     rkv: Option<tokio::sync::broadcast::Receiver<Events>>,
+    is_visible: Rc<Cell<bool>>,
 ) {
     match name {
         "separator" => {
@@ -292,12 +297,15 @@ pub fn get_widget(
             container.append(&clock_label);
 
             let clock_label = Rc::new(clock_label);
-            // Note: Clock visibility optimization could be added here with window state
+            // Optimize clock updates: only update when window is visible
             glib::timeout_add_local(std::time::Duration::from_secs(1), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {
-                    let now = chrono::Local::now();
-                    clock_label.set_label(&now.format("%I:%M:%S %P").to_string());
+                    // Only update the clock if the window is visible
+                    if is_visible.get() {
+                        let now = chrono::Local::now();
+                        clock_label.set_label(&now.format("%I:%M:%S %P").to_string());
+                    }
                     ControlFlow::Continue
                 }
             });

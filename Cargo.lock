@@ -757,6 +757,7 @@ dependencies = [
  "gtk4",
  "gtk4-layer-shell",
  "muelle-core",
+ "parking_lot",
  "serde",
  "serde_json",
  "tokio",

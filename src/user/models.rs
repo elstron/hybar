@@ -44,5 +44,6 @@ pub struct WidgetsConfig {
 pub struct CustomAppsConfig {
     pub name: Option<String>,
     pub icon: Option<String>,
-    pub command: Option<String>,
+    pub cmd: Option<String>,
+    pub tooltip: Option<bool>,
 }

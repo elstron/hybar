@@ -1,8 +1,61 @@
 {
-  "widgets": [
-    { "name": "config", "priority": 1 },
-    { "name": "clock", "priority": 2 },
-    { "name": "calendar", "priority": 3 },
-    { "name": "apps", "priority": 4 }
-  ]
+  "ui": {
+    "background": "#15141b",
+    "accent": "#89b4fa"
+  },
+  "bar": {
+    "height": 32,
+    "autohide": false
+  },
+  "sections": {
+    "center": ["clock"],
+    "left": [
+      "apps",
+      "separator",
+      "chrome",
+      "terminal",
+      "browser",
+      "separator",
+      "vscode",
+      "title"
+    ],
+    "right": ["workspaces"]
+  },
+  "widgets": {
+    "separator": {
+      "icon": "•",
+      "size": 10
+    },
+    "clock": {
+      "format": "HH:mm",
+      "timezone": "local"
+    },
+    "workspaces": {
+      "show_icons": true,
+      "max_workspaces": 10
+    }
+  },
+  "custom_apps": {
+    "browser": {
+      "icon": null,
+      "name": "firefox",
+      "cmd": "firefox --new-window"
+    },
+    "terminal": {
+      "icon": null,
+      "name": "kitty",
+      "cmd": "kitty"
+    },
+    "apps": {
+      "icon": "",
+      "name": "launcher_app",
+      "cmd": "rofi -show drun",
+      "tooltip": true
+    },
+    "chrome": {
+      "icon": null,
+      "name": "chromium",
+      "cmd": "chromium --new-window"
+    }
+  }
 }

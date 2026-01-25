@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+parking_lot = "0.12"
 clock = { path = "widgets/clock" }
 gtk = { version = "0.9", package = "gtk4" }
 gtk4-layer-shell = "0.5.0"

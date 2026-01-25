@@ -1,16 +1,13 @@
-use chrono::Local;
 use gtk::prelude::*;
 use gtk::{Box as GtkBox, GestureClick, Label};
-use muelle_core::Widget;
 use serde::Deserialize;
-use std::cell::RefCell;
 use std::process::Command;
-use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
 pub struct Workspace {
     pub id: i32,
     pub name: String,
+    pub lastwindow: String,
 }
 
 pub fn get_workspaces() -> Vec<Workspace> {
@@ -25,7 +22,7 @@ pub fn get_workspaces() -> Vec<Workspace> {
     serde_json::from_str(&json_str).expect("Error al parsear JSON")
 }
 
-pub fn update_workspaces(container: &GtkBox) {
+pub fn update_workspaces(container: &GtkBox, urgent_id: Option<&String>) {
     let active_ws = get_active_workspace();
 
     {
@@ -39,11 +36,9 @@ pub fn update_workspaces(container: &GtkBox) {
 
     let mut workspaces = get_workspaces();
 
-    // Ordena por id para orden visual
     workspaces.sort_by_key(|ws| ws.id);
 
     for ws in workspaces {
-        //let label = Label::new(Some(&ws.name));
         let label = Label::new(None);
         label.set_text("\u{f111}");
 
@@ -51,6 +46,11 @@ pub fn update_workspaces(container: &GtkBox) {
             if ws.id == active.id {
                 label.add_css_class("workspace-active");
                 label.set_text("\u{f192}");
+            } else if let Some(urgent) = urgent_id
+                && ws.lastwindow.contains(urgent)
+            {
+                label.add_css_class("workspace-urgent");
+                label.set_text("\u{f111}");
             } else {
                 label.add_css_class("workspace");
                 label.set_text("\u{f111}");

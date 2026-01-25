@@ -1,39 +1,31 @@
-use glib::ControlFlow::{self, Continue};
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation};
+use glib::ControlFlow::{self};
+use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, PositionType, pango};
+use gtk::{Popover, prelude::*};
 use gtk4_layer_shell::LayerShell;
 mod config;
 mod utils;
 mod widgets;
 use config::{hidden_layer_configuration, layer_shell_configure};
-use serde::Deserialize;
 use utils::css::load_css;
+mod client;
 mod user;
 use chrono::Local;
+use client::hyprland_event_listener;
 use std::cell::Cell;
 use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixStream;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use user::config::load_config;
 
 use crate::user::models::UserConfig;
 use crate::widgets::workspaces::update_workspaces;
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
-// Hyprland socket subscription message
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
-
-#[derive(Deserialize)]
-struct WidgetConfig {
-    name: String,
-}
-
-#[derive(Deserialize)]
-pub struct ConfigFile {
-    widgets: Vec<WidgetConfig>,
-}
+const DEBOUNCE_MS: u64 = 50;
 
 #[derive(Debug)]
 pub struct BarSections {
@@ -42,11 +34,23 @@ pub struct BarSections {
     center: GtkBox,
     container: GtkBox,
 }
-#[derive(Clone)]
-pub enum Events {
-    WorkspaceChange(String),
-    FullscreenChange(),
-    TitleChange(String),
+
+pub struct EventState {
+    pending_workspace: AtomicBool,
+    pending_fullscreen: AtomicBool,
+    pending_title: parking_lot::Mutex<Option<String>>,
+    pending_workspace_urgent: parking_lot::Mutex<Option<String>>,
+}
+
+impl EventState {
+    fn new() -> Self {
+        Self {
+            pending_workspace: AtomicBool::new(false),
+            pending_fullscreen: AtomicBool::new(false),
+            pending_title: parking_lot::Mutex::new(None),
+            pending_workspace_urgent: parking_lot::Mutex::new(None),
+        }
+    }
 }
 
 #[tokio::main]
@@ -89,103 +93,41 @@ async fn main() {
         let section_center = Rc::new(section_center);
         let section_right = Rc::new(section_right);
 
-        let (tx, _) = tokio::sync::broadcast::channel(128);
-
         let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
 
-        // Only create receivers for widgets that need them
-        for widget in user_config.sections.right.iter() {
-            let rx = if widget_needs_receiver(widget) {
-                Some(tx.subscribe())
-            } else {
-                None
-            };
-            get_widget(
-                widget,
-                &section_right,
-                &user_config,
-                rx,
-                Rc::clone(&is_window_visible),
-            );
+        let event_state = Arc::new(EventState::new());
+
+        let has_workspace_widget_left = create_widgets(
+            &user_config.sections.left,
+            &section_left,
+            &user_config,
+            Arc::clone(&event_state),
+            Rc::clone(&is_window_visible),
+        );
+        let has_workspace_widget_center = create_widgets(
+            &user_config.sections.center,
+            &section_center,
+            &user_config,
+            Arc::clone(&event_state),
+            Rc::clone(&is_window_visible),
+        );
+        let has_workspace_widget_right = create_widgets(
+            &user_config.sections.right,
+            &section_right,
+            &user_config,
+            Arc::clone(&event_state),
+            Rc::clone(&is_window_visible),
+        );
+        let has_workspace_widget =
+            has_workspace_widget_left || has_workspace_widget_center || has_workspace_widget_right;
+
+        if has_workspace_widget || widget_exists(&user_config, "title") {
+            let event_state_clone = Arc::clone(&event_state);
+
+            tokio::spawn(async move {
+                hyprland_event_listener(event_state_clone).await;
+            });
         }
-
-        for widget in user_config.sections.center.iter() {
-            let rx = if widget_needs_receiver(widget) {
-                Some(tx.subscribe())
-            } else {
-                None
-            };
-            get_widget(
-                widget,
-                &section_center,
-                &user_config,
-                rx,
-                Rc::clone(&is_window_visible),
-            );
-        }
-
-        for widget in user_config.sections.left.iter() {
-            let rx = if widget_needs_receiver(widget) {
-                Some(tx.subscribe())
-            } else {
-                None
-            };
-            get_widget(
-                widget,
-                &section_left,
-                &user_config,
-                rx,
-                Rc::clone(&is_window_visible),
-            );
-        }
-        let tx_clone = tx.clone();
-        glib::MainContext::default().spawn_local(async move {
-            if let Some(path) = get_hypr_socket_path() {
-                match UnixStream::connect(path).await {
-                    Ok(mut stream) => {
-                        if let Err(e) = stream.write_all(HYPRLAND_SUBSCRIPTION.as_bytes()).await {
-                            eprintln!("Failed to subscribe to Hyprland events: {}", e);
-                            return;
-                        }
-
-                        let reader = BufReader::new(stream);
-                        let mut lines = reader.lines();
-
-                        while let Ok(Some(line)) = lines.next_line().await {
-                            println!("Received: {}", line);
-                            let is_workspace_change =
-                                line.contains("\"change\":") || line.contains("workspace");
-                            let is_title_change = line.contains("activewindow>>");
-                            let is_fullscreen_change =
-                                line.contains("fullscreen") && line.contains("1");
-
-                            if is_workspace_change {
-                                tx_clone.send(Events::WorkspaceChange(line.clone())).ok();
-                                continue;
-                            }
-
-                            if is_fullscreen_change {
-                                tx_clone.send(Events::FullscreenChange()).ok();
-                                continue;
-                            }
-
-                            if is_title_change {
-                                let parts: Vec<&str> = line.split(">>").collect();
-                                if parts.len() == 2 {
-                                    let title = parts[1].trim().to_string();
-                                    tx_clone.send(Events::TitleChange(title)).ok();
-                                }
-                                continue;
-                            }
-                            continue;
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to connect to Hyprland socket: {}", e);
-                    }
-                }
-            }
-        });
 
         section_container.append(section_left.as_ref());
         section_container.append(section_center.as_ref());
@@ -199,17 +141,18 @@ async fn main() {
 
         println!("Autohide: {:?}", user_config.bar);
 
-        let mut rx = tx.subscribe();
-        glib::MainContext::default().spawn_local(async move {
-            while let Ok(event) = rx.recv().await {
-                match event {
-                    Events::FullscreenChange() => {
-                        // TODO: Implement auto-hide logic for fullscreen
-                    }
-                    _ => continue,
-                }
+        let event_state_fullscreen = Arc::clone(&event_state);
+        glib::timeout_add_local(Duration::from_millis(100), move || {
+            if event_state_fullscreen
+                .pending_fullscreen
+                .swap(false, Ordering::Relaxed)
+            {
+                // TODO: Implement auto-hide logic for fullscreen
+                println!("Fullscreen state changed");
             }
+            ControlFlow::Continue
         });
+
         if user_config.bar.autohide {
             window.add_controller(motion_controller_for_normal_window);
             hidden_window.add_controller(motion_controller_for_hidden_window);
@@ -221,6 +164,38 @@ async fn main() {
     });
 
     app.run();
+}
+
+fn create_widgets(
+    widgets: &[String],
+    container: &Rc<GtkBox>,
+    config: &UserConfig,
+    event_state: Arc<EventState>,
+    is_visible: Rc<Cell<bool>>,
+) -> bool {
+    let mut has_workspace = false;
+
+    println!("Creating widgets: {:?}", widgets);
+    for widget in widgets.iter() {
+        if widget == "workspaces" {
+            has_workspace = true;
+        }
+        get_widget(
+            widget,
+            container,
+            config,
+            Arc::clone(&event_state),
+            Rc::clone(&is_visible),
+        );
+    }
+
+    has_workspace
+}
+
+fn widget_exists(config: &UserConfig, widget_name: &str) -> bool {
+    config.sections.left.contains(&widget_name.to_string())
+        || config.sections.center.contains(&widget_name.to_string())
+        || config.sections.right.contains(&widget_name.to_string())
 }
 
 pub fn layer_motion_controller(
@@ -241,7 +216,6 @@ pub fn layer_motion_controller(
             hidden_bar_clone.set_focusable(true);
             glib::ControlFlow::Break
         });
-        println!("Se salio de la zona de la barra");
     });
     motion_controller
 }
@@ -259,7 +233,6 @@ pub fn hidden_bar_motion_controller(
     let bar_clone = bar.clone();
 
     motion_controller.connect_enter(move |_, _x, _y| {
-        println!("Se entro en la zona de la barra oculta");
         is_visible.set(true);
         hidden_bar_clone.set_focusable(false);
         bar_clone.present();
@@ -272,7 +245,7 @@ pub fn get_widget(
     name: &str,
     container: &Rc<GtkBox>,
     config: &UserConfig,
-    rkv: Option<tokio::sync::broadcast::Receiver<Events>>,
+    event_state: Arc<EventState>,
     is_visible: Rc<Cell<bool>>,
 ) {
     match name {
@@ -283,34 +256,34 @@ pub fn get_widget(
             container.append(&separator);
         }
         "workspaces" => {
-            if let Some(mut rkv) = rkv {
-                let container = Rc::clone(container);
-                update_workspaces(&container);
+            let container = Rc::clone(container);
+            let workspaces_box = GtkBox::new(Orientation::Horizontal, 5);
+            workspaces_box.add_css_class("workspaces-box");
+            container.append(&workspaces_box);
+            update_workspaces(&workspaces_box, None);
 
-                glib::MainContext::default().spawn_local(async move {
-                    while let Ok(event) = rkv.recv().await {
-                        match event {
-                            Events::WorkspaceChange(_) => update_workspaces(&container),
-                            _ => continue,
-                        }
-                    }
-                });
-            } else {
-                update_workspaces(container);
-            }
+            glib::timeout_add_local(Duration::from_millis(100), move || {
+                if event_state.pending_workspace.swap(false, Ordering::Relaxed) {
+                    update_workspaces(&workspaces_box, None);
+                } else if let Some(urgent_id) = event_state.pending_workspace_urgent.lock().take() {
+                    update_workspaces(&workspaces_box, Some(&urgent_id));
+                }
+                ControlFlow::Continue
+            });
         }
         "clock" => {
-            println!("Agregando widget de reloj");
+            let clock_container = gtk::Box::new(Orientation::Horizontal, 5);
+            clock_container.add_css_class("clock-container");
             let clock_label =
                 gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
-
-            container.append(&clock_label);
+            clock_container.append(&clock_label);
+            container.append(&clock_container);
 
             let clock_label = Rc::new(clock_label);
-            glib::timeout_add_local(std::time::Duration::from_secs(60), {
+            let is_visible = Rc::clone(&is_visible);
+            glib::timeout_add_local(std::time::Duration::from_secs(15), {
                 let clock_label = Rc::clone(&clock_label);
                 move || {
-                    // Only update the clock if the window is visible
                     if is_visible.get() {
                         let now = chrono::Local::now();
                         clock_label.set_label(&now.format("%I:%M %P").to_string());
@@ -320,34 +293,60 @@ pub fn get_widget(
             });
         }
         "title" => {
+            let title_container = gtk::Box::new(Orientation::Horizontal, 5);
+            title_container.add_css_class("title-container");
+            container.append(&title_container);
+
             let title_label = gtk::Label::new(Some("Titulo de ventana"));
+            title_label.set_ellipsize(pango::EllipsizeMode::End);
+            title_label.set_max_width_chars(100);
+            let title_label = Rc::new(title_label);
+            title_container.append(title_label.as_ref());
 
-            if let Some(mut rkv) = rkv {
-                let title_label_clone = title_label.clone();
-                glib::MainContext::default().spawn_local(async move {
-                    while let Ok(event) = rkv.recv().await {
-                        match event {
-                            Events::TitleChange(new_title) => {
-                                title_label_clone.set_text(&new_title);
-                            }
-                            _ => continue,
-                        }
-                    }
-                });
-            }
-
-            container.append(&title_label);
+            glib::timeout_add_local(Duration::from_millis(100), move || {
+                if let Some(new_title) = event_state.pending_title.lock().take() {
+                    title_label.set_text(&new_title);
+                }
+                ControlFlow::Continue
+            });
         }
         _ => {
-            println!("Widget no reconocido: {}", name);
+            let button = config.custom_apps.get(name);
+            if let Some(button) = button {
+                let btn = match button.icon.as_deref() {
+                    Some(icon_name) => gtk::Button::with_label(icon_name),
+                    None => gtk::Button::from_icon_name(
+                        button.name.as_deref().unwrap_or("application-x-executable"),
+                    ),
+                };
+                btn.add_css_class("custom-app");
+                if let Some(cmd) = &button.cmd {
+                    let cmd = cmd.clone();
+                    btn.connect_clicked(move |_| {
+                        std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(&cmd)
+                            .current_dir(std::env::var("HOME").unwrap())
+                            .spawn()
+                            .expect("failed to execute process")
+                            .wait()
+                            .expect("failed to wait on child");
+                    });
+                }
+                if button.tooltip.unwrap_or(false) {
+                    //let vbox = GtkBox::new(Orientation::Vertical, 5);
+                    //let label = gtk::Label::new(Some(
+                    //    button.name.as_deref().unwrap_or("Custom Application"),
+                    //));
+                    //vbox.append(&label);
+                    //set_popover(&btn, &vbox);
+                }
+
+                container.append(&btn)
+            }
         }
     }
 }
-
-fn widget_needs_receiver(widget_name: &str) -> bool {
-    matches!(widget_name, "workspaces" | "title")
-}
-
 fn create_sections() -> BarSections {
     let section_left = gtk::Box::new(Orientation::Horizontal, 0);
     section_left.set_halign(gtk::Align::Start);
@@ -357,7 +356,8 @@ fn create_sections() -> BarSections {
     section_center.set_halign(gtk::Align::Center);
     section_center.add_css_class("section-center");
 
-    let section_container = gtk::Box::new(Orientation::Horizontal, 0);
+    let section_container = gtk::Box::new(Orientation::Horizontal, 10);
+    section_container.set_homogeneous(true);
     section_container.set_halign(gtk::Align::Fill);
     section_container.add_css_class("section-container");
 
@@ -373,7 +373,7 @@ fn create_sections() -> BarSections {
     }
 }
 
-fn get_hypr_socket_path() -> Option<PathBuf> {
+pub fn get_hypr_socket_path() -> Option<PathBuf> {
     let runtime_dir = env::var("XDG_RUNTIME_DIR").ok()?;
     let instance = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
     Some(
@@ -382,4 +382,30 @@ fn get_hypr_socket_path() -> Option<PathBuf> {
             .join(instance)
             .join(".socket2.sock"),
     )
+}
+
+pub fn set_popover(button: &gtk::Button, child: &GtkBox) {
+    let vbox = GtkBox::new(Orientation::Vertical, 5);
+    vbox.append(child);
+    let parent = button.parent().unwrap();
+    let popover = Popover::builder()
+        .child(&vbox)
+        .has_arrow(true)
+        .position(PositionType::Bottom)
+        .build();
+
+    popover.set_parent(&parent);
+
+    let motion_controller = gtk::EventControllerMotion::new();
+
+    let popover_clone = popover.clone();
+    motion_controller.connect_enter(move |_, _, _| {
+        popover_clone.present();
+    });
+
+    motion_controller.connect_leave(move |_| {
+        popover.popdown();
+    });
+
+    button.add_controller(motion_controller);
 }

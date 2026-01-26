@@ -1,5 +1,5 @@
 use glib::ControlFlow::{self};
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, PositionType, pango};
+use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, PositionType, gio, pango};
 use gtk::{Popover, prelude::*};
 use gtk4_layer_shell::LayerShell;
 mod config;
@@ -38,6 +38,7 @@ pub struct BarSections {
 pub struct EventState {
     pending_workspace: AtomicBool,
     pending_fullscreen: AtomicBool,
+    is_fullscreen: AtomicBool,
     pending_title: parking_lot::Mutex<Option<String>>,
     pending_workspace_urgent: parking_lot::Mutex<Option<String>>,
 }
@@ -47,6 +48,7 @@ impl EventState {
         Self {
             pending_workspace: AtomicBool::new(false),
             pending_fullscreen: AtomicBool::new(false),
+            is_fullscreen: AtomicBool::new(false),
             pending_title: parking_lot::Mutex::new(None),
             pending_workspace_urgent: parking_lot::Mutex::new(None),
         }
@@ -139,28 +141,49 @@ async fn main() {
         let motion_controller_for_hidden_window =
             hidden_bar_motion_controller(&window, &hidden_window, Rc::clone(&is_window_visible));
 
+        window.add_controller(motion_controller_for_normal_window.clone());
+        hidden_window.add_controller(motion_controller_for_hidden_window.clone());
+
+        if !user_config.bar.autohide {
+            println!("Autohide disabled");
+            hidden_window.set_focusable(false);
+            window.set_focusable(false);
+
+            window.remove_controller(&motion_controller_for_normal_window);
+            hidden_window.remove_controller(&motion_controller_for_hidden_window);
+
+            is_window_visible.set(true);
+        }
         println!("Autohide: {:?}", user_config.bar);
 
+        let window_clone = window.clone();
+        let hidden_window_clone = hidden_window.clone();
+        let is_window_visible_clone = Rc::clone(&is_window_visible);
         let event_state_fullscreen = Arc::clone(&event_state);
+        let hidden_controller_clone = motion_controller_for_hidden_window.clone();
+        let normal_controller_clone = motion_controller_for_normal_window.clone();
+
         glib::timeout_add_local(Duration::from_millis(100), move || {
             if event_state_fullscreen
                 .pending_fullscreen
                 .swap(false, Ordering::Relaxed)
             {
-                // TODO: Implement auto-hide logic for fullscreen
-                println!("Fullscreen state changed");
+                let is_fullscreen = event_state_fullscreen.is_fullscreen.load(Ordering::Relaxed);
+                handle_fullscreen_event(
+                    &window_clone,
+                    &hidden_window_clone,
+                    Rc::clone(&is_window_visible_clone),
+                    is_fullscreen,
+                    user_config.bar.autohide,
+                    &normal_controller_clone,
+                    &hidden_controller_clone,
+                );
             }
             ControlFlow::Continue
         });
 
-        if user_config.bar.autohide {
-            window.add_controller(motion_controller_for_normal_window);
-            hidden_window.add_controller(motion_controller_for_hidden_window);
-            window.hide();
-            hidden_window.present();
-        } else {
-            window.present();
-        }
+        hidden_window.present();
+        window.present();
     });
 
     app.run();
@@ -225,10 +248,7 @@ pub fn hidden_bar_motion_controller(
     hidden_bar: &ApplicationWindow,
     is_visible: Rc<Cell<bool>>,
 ) -> gtk::EventControllerMotion {
-    bar.hide();
-
     let motion_controller = gtk::EventControllerMotion::new();
-
     let hidden_bar_clone = hidden_bar.clone();
     let bar_clone = bar.clone();
 
@@ -322,16 +342,24 @@ pub fn get_widget(
                 btn.add_css_class("custom-app");
                 if let Some(cmd) = &button.cmd {
                     let cmd = cmd.clone();
-                    btn.connect_clicked(move |_| {
-                        std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg(&cmd)
-                            .current_dir(std::env::var("HOME").unwrap())
-                            .spawn()
-                            .expect("failed to execute process")
-                            .wait()
-                            .expect("failed to wait on child");
-                    });
+
+                    if cmd.contains(".desktop")
+                        && let Some(app) = gio::DesktopAppInfo::new(cmd.as_str())
+                    {
+                        app.launch(&[], None::<&gio::AppLaunchContext>)
+                            .expect("Failed to launch application");
+                    } else {
+                        btn.connect_clicked(move |_| {
+                            std::process::Command::new("sh")
+                                .arg("-c")
+                                .arg(&cmd)
+                                .current_dir(std::env::var("HOME").unwrap())
+                                .spawn()
+                                .expect("failed to execute process")
+                                .wait()
+                                .expect("failed to wait on child");
+                        });
+                    }
                 }
                 if button.tooltip.unwrap_or(false) {
                     //let vbox = GtkBox::new(Orientation::Vertical, 5);
@@ -408,4 +436,35 @@ pub fn set_popover(button: &gtk::Button, child: &GtkBox) {
     });
 
     button.add_controller(motion_controller);
+}
+
+pub fn handle_fullscreen_event(
+    window: &ApplicationWindow,
+    hidden_window: &ApplicationWindow,
+    is_window_visible: Rc<Cell<bool>>,
+    is_fullscreen: bool,
+    autohide: bool,
+    normal_controller: &gtk::EventControllerMotion,
+    hidden_controller: &gtk::EventControllerMotion,
+) {
+    if is_fullscreen {
+        window.hide();
+        hidden_window.set_focusable(true);
+        is_window_visible.set(false);
+
+        if !autohide {
+            window.add_controller(normal_controller.clone());
+            hidden_window.add_controller(hidden_controller.clone());
+        }
+    }
+
+    if !is_fullscreen {
+        hidden_window.set_focusable(false);
+        if !autohide {
+            window.remove_controller(normal_controller);
+            hidden_window.remove_controller(hidden_controller);
+            window.present();
+            is_window_visible.set(true);
+        }
+    }
 }

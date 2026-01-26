@@ -2,7 +2,7 @@
   all: unset;
   background-color: transparent;
   color: #ffffff;
-  font-family: 'JetBrainsMono Nerd Font', 'Font Awesome 6 Free', 'Font Awesome 6 Brands', monospace;
+  font-family: 'JetBrainsMono Nerd Font', monospace;
   font-size: 13px;
   font-weight: bold;
 }
@@ -20,9 +20,12 @@
   margin-left: 20px;
   margin-right: 20px;
   background: #15141b;
+  margin-bottom: 5px;
   border-radius: 10px;
   padding-left: 10px;
   padding-right: 10px;
+  border: 1px solid #222027;
+  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
 }
 
 .section-center, .section-left, .section-right {

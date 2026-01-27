@@ -1,6 +1,7 @@
 use glib::ControlFlow::{self};
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, PositionType, gio, pango};
-use gtk::{Popover, prelude::*};
+use gtk::gdk::Cursor;
+use gtk::prelude::*;
+use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, gio, pango};
 use gtk4_layer_shell::LayerShell;
 mod config;
 mod utils;
@@ -165,7 +166,6 @@ async fn main() {
 
             is_window_visible.set(true);
         }
-        println!("Autohide: {:?}", user_config.bar);
 
         let window_clone = window.clone();
         let hidden_window_clone = hidden_window.clone();
@@ -198,13 +198,6 @@ async fn main() {
             {
                 println!("Reloading configuration...");
                 let new_config = load_config().unwrap_or_default();
-
-                //println!("New configuration: {:?}", new_config);
-
-                println!(
-                    "Rebuilding widgets..., cache: {:?}",
-                    widgets_cache.borrow().keys()
-                );
 
                 build_widgets(
                     &widgets_cache,
@@ -277,9 +270,6 @@ fn create_widgets(
         if item == "workspaces" {
             has_workspace = true;
         }
-
-        println!("Processing widget: {}", item);
-        println!("Current cache keys: {:?}", widgets_cache.borrow().keys());
 
         let widget = widgets_cache
             .borrow_mut()
@@ -397,13 +387,16 @@ pub fn get_widget(
                 }
             });
 
+            clock_container
+                .set_tooltip_markup(Some(&Local::now().format("%A, %B %d, %Y").to_string()));
+
             clock_container.into()
         }
         "title" => {
             let title_container = gtk::Box::new(Orientation::Horizontal, 5);
             title_container.add_css_class("title-container");
 
-            let title_label = gtk::Label::new(Some("Titulo de ventana"));
+            let title_label = gtk::Label::new(Some(""));
             title_label.set_ellipsize(pango::EllipsizeMode::End);
             title_label.set_max_width_chars(100);
             let title_label = Rc::new(title_label);
@@ -439,6 +432,10 @@ pub fn get_widget(
                     ),
                 };
                 btn.add_css_class("custom-app");
+
+                let cursor = Cursor::from_name("pointer", None);
+                btn.set_cursor(cursor.as_ref());
+
                 if let Some(cmd) = &button.cmd {
                     let cmd = cmd.clone();
 
@@ -450,13 +447,8 @@ pub fn get_widget(
                         }
                     });
                 }
-                if button.tooltip.unwrap_or(false) {
-                    //let vbox = GtkBox::new(Orientation::Vertical, 5);
-                    //let label = gtk::Label::new(Some(
-                    //    button.name.as_deref().unwrap_or("Custom Application"),
-                    //));
-                    //vbox.append(&label);
-                    //set_popover(&btn, &vbox);
+                if button.tooltip.unwrap_or(true) {
+                    btn.set_tooltip_text(Some(button.name.as_deref().unwrap_or("")));
                 }
 
                 btn.into()
@@ -503,30 +495,28 @@ pub fn get_hypr_socket_path() -> Option<PathBuf> {
     )
 }
 
-pub fn set_popover(button: &gtk::Button, child: &GtkBox) {
-    let vbox = GtkBox::new(Orientation::Vertical, 5);
-    vbox.append(child);
-    let parent = button.parent().unwrap();
-    let popover = Popover::builder()
-        .child(&vbox)
+pub fn set_popover(button: &gtk::Button, child: gtk::Widget) {
+    let popover = gtk::Popover::builder()
+        .child(&child)
         .has_arrow(true)
-        .position(PositionType::Bottom)
+        .position(gtk::PositionType::Bottom)
         .build();
 
-    popover.set_parent(&parent);
+    popover.set_parent(button);
 
-    let motion_controller = gtk::EventControllerMotion::new();
+    let motion = gtk::EventControllerMotion::new();
 
-    let popover_clone = popover.clone();
-    motion_controller.connect_enter(move |_, _, _| {
-        popover_clone.present();
+    let popover_show = popover.clone();
+    motion.connect_enter(move |_, _, _| {
+        popover_show.present();
     });
 
-    motion_controller.connect_leave(move |_| {
-        popover.popdown();
+    let popover_hide = popover.clone();
+    motion.connect_leave(move |_| {
+        popover_hide.popdown();
     });
 
-    button.add_controller(motion_controller);
+    button.add_controller(motion);
 }
 
 pub fn handle_fullscreen_event(

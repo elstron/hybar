@@ -1,4 +1,5 @@
 use glib::ControlFlow;
+use gtk::gdk::Cursor;
 use gtk::prelude::*;
 use gtk::{Box as GtkBox, GestureClick, Label};
 use serde::Deserialize;
@@ -6,6 +7,8 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+const ANY_BUTTON: u32 = 0;
 
 pub trait HasPendingWorkspace: Send + Sync {
     fn pending_workspace(&self) -> &AtomicBool;
@@ -88,9 +91,10 @@ pub fn update_workspaces(container: &GtkBox, urgent_id: Option<&String>) {
             label.add_css_class("workspace");
             label.set_text("\u{f111}");
         }
+        let cursor = Cursor::from_name("pointer", None);
 
         let gesture = GestureClick::new();
-        gesture.set_button(0); // acepta cualquier botón
+        gesture.set_button(ANY_BUTTON);
 
         let ws_name = ws.name.clone();
         gesture.connect_pressed(move |_, _, _, _| {
@@ -100,6 +104,8 @@ pub fn update_workspaces(container: &GtkBox, urgent_id: Option<&String>) {
         });
 
         label.add_controller(gesture);
+        label.set_tooltip_text(Some(&format!("Workspace {}", ws.name)));
+        label.set_cursor(cursor.as_ref());
         container.append(&label);
     }
 }

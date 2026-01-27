@@ -16,7 +16,6 @@
       "terminal",
       "browser",
       "separator",
-      "vscode",
       "title"
     ],
     "right": ["workspaces"]

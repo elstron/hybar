@@ -1,13 +1,42 @@
+use glib::ControlFlow;
 use gtk::prelude::*;
 use gtk::{Box as GtkBox, GestureClick, Label};
 use serde::Deserialize;
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
+pub trait HasPendingWorkspace: Send + Sync {
+    fn pending_workspace(&self) -> &AtomicBool;
+    fn pending_workspace_urgent(&self) -> &parking_lot::Mutex<Option<String>>;
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Workspace {
     pub id: i32,
     pub name: String,
     pub lastwindow: String,
+}
+
+pub fn workspaces_build<S: HasPendingWorkspace + 'static>(event_state: Arc<S>) -> gtk::Widget {
+    let workspaces_box = GtkBox::new(gtk::Orientation::Horizontal, 5);
+    workspaces_box.add_css_class("workspaces-box");
+    update_workspaces(&workspaces_box, None);
+
+    let workspaces_box_clone = workspaces_box.clone();
+    glib::timeout_add_local(Duration::from_millis(100), move || {
+        if event_state
+            .pending_workspace()
+            .swap(false, Ordering::Relaxed)
+        {
+            update_workspaces(&workspaces_box_clone, None);
+        } else if let Some(urgent_id) = event_state.pending_workspace_urgent().lock().take() {
+            update_workspaces(&workspaces_box_clone, Some(&urgent_id));
+        }
+        ControlFlow::Continue
+    });
+    workspaces_box.into()
 }
 
 pub fn get_workspaces() -> Vec<Workspace> {

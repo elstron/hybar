@@ -6,22 +6,29 @@ mod config;
 mod utils;
 mod widgets;
 use config::{hidden_layer_configuration, layer_shell_configure};
+use settings::HasPendingReload;
 use utils::css::load_css;
 mod client;
 mod user;
 use chrono::Local;
 use client::hyprland_event_listener;
-use std::cell::Cell;
-use std::env;
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-use user::config::load_config;
+use std::{
+    cell::Cell,
+    collections::HashSet,
+    env,
+    path::PathBuf,
+    rc::Rc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
-use crate::user::models::UserConfig;
-use crate::widgets::workspaces::update_workspaces;
+use user::config::load_config;
+use user::models::UserConfig;
+use widgets::workspaces;
+use widgets::workspaces::HasPendingWorkspace;
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
@@ -41,6 +48,7 @@ pub struct EventState {
     is_fullscreen: AtomicBool,
     pending_title: parking_lot::Mutex<Option<String>>,
     pending_workspace_urgent: parking_lot::Mutex<Option<String>>,
+    pending_reload: AtomicBool,
 }
 
 impl EventState {
@@ -51,7 +59,23 @@ impl EventState {
             is_fullscreen: AtomicBool::new(false),
             pending_title: parking_lot::Mutex::new(None),
             pending_workspace_urgent: parking_lot::Mutex::new(None),
+            pending_reload: AtomicBool::new(false),
         }
+    }
+}
+impl HasPendingReload for EventState {
+    fn pending_reload(&self) -> &AtomicBool {
+        &self.pending_reload
+    }
+}
+
+impl HasPendingWorkspace for EventState {
+    fn pending_workspace(&self) -> &AtomicBool {
+        &self.pending_workspace
+    }
+
+    fn pending_workspace_urgent(&self) -> &parking_lot::Mutex<Option<String>> {
+        &self.pending_workspace_urgent
     }
 }
 
@@ -95,34 +119,21 @@ async fn main() {
         let section_center = Rc::new(section_center);
         let section_right = Rc::new(section_right);
 
+        let widgets_cache: Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>> =
+            Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
         let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
 
         let event_state = Arc::new(EventState::new());
 
-        let has_workspace_widget_left = create_widgets(
-            &user_config.sections.left,
-            &section_left,
+        let has_workspace_widget = build_widgets(
+            &widgets_cache,
             &user_config,
-            Arc::clone(&event_state),
-            Rc::clone(&is_window_visible),
+            Rc::clone(&section_left),
+            Rc::clone(&section_right),
+            Rc::clone(&section_center),
+            &event_state,
+            &is_window_visible,
         );
-        let has_workspace_widget_center = create_widgets(
-            &user_config.sections.center,
-            &section_center,
-            &user_config,
-            Arc::clone(&event_state),
-            Rc::clone(&is_window_visible),
-        );
-        let has_workspace_widget_right = create_widgets(
-            &user_config.sections.right,
-            &section_right,
-            &user_config,
-            Arc::clone(&event_state),
-            Rc::clone(&is_window_visible),
-        );
-        let has_workspace_widget =
-            has_workspace_widget_left || has_workspace_widget_center || has_workspace_widget_right;
-
         if has_workspace_widget || widget_exists(&user_config, "title") {
             let event_state_clone = Arc::clone(&event_state);
 
@@ -159,16 +170,17 @@ async fn main() {
         let window_clone = window.clone();
         let hidden_window_clone = hidden_window.clone();
         let is_window_visible_clone = Rc::clone(&is_window_visible);
-        let event_state_fullscreen = Arc::clone(&event_state);
+        let event_state_clone = Arc::clone(&event_state);
         let hidden_controller_clone = motion_controller_for_hidden_window.clone();
         let normal_controller_clone = motion_controller_for_normal_window.clone();
+        let widgets_cache = Rc::clone(&widgets_cache);
 
         glib::timeout_add_local(Duration::from_millis(100), move || {
-            if event_state_fullscreen
+            if event_state_clone
                 .pending_fullscreen
                 .swap(false, Ordering::Relaxed)
             {
-                let is_fullscreen = event_state_fullscreen.is_fullscreen.load(Ordering::Relaxed);
+                let is_fullscreen = event_state_clone.is_fullscreen.load(Ordering::Relaxed);
                 handle_fullscreen_event(
                     &window_clone,
                     &hidden_window_clone,
@@ -177,6 +189,31 @@ async fn main() {
                     user_config.bar.autohide,
                     &normal_controller_clone,
                     &hidden_controller_clone,
+                );
+            }
+
+            if event_state_clone
+                .pending_reload
+                .swap(false, Ordering::Relaxed)
+            {
+                println!("Reloading configuration...");
+                let new_config = load_config().unwrap_or_default();
+
+                //println!("New configuration: {:?}", new_config);
+
+                println!(
+                    "Rebuilding widgets..., cache: {:?}",
+                    widgets_cache.borrow().keys()
+                );
+
+                build_widgets(
+                    &widgets_cache,
+                    &new_config,
+                    Rc::clone(&section_left),
+                    Rc::clone(&section_right),
+                    Rc::clone(&section_center),
+                    &event_state_clone,
+                    &is_window_visible_clone,
                 );
             }
             ControlFlow::Continue
@@ -189,7 +226,44 @@ async fn main() {
     app.run();
 }
 
+pub fn build_widgets(
+    widgets_cache: &Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>>,
+    user_config: &UserConfig,
+    section_left: Rc<GtkBox>,
+    section_right: Rc<GtkBox>,
+    section_center: Rc<GtkBox>,
+    event_state: &Arc<EventState>,
+    is_window_visible: &Rc<Cell<bool>>,
+) -> bool {
+    let has_workspace_widget_left = create_widgets(
+        Rc::clone(widgets_cache),
+        &user_config.sections.left,
+        &section_left,
+        user_config,
+        Arc::clone(event_state),
+        Rc::clone(is_window_visible),
+    );
+    let has_workspace_widget_center = create_widgets(
+        Rc::clone(widgets_cache),
+        &user_config.sections.center,
+        &section_center,
+        user_config,
+        Arc::clone(event_state),
+        Rc::clone(is_window_visible),
+    );
+    let has_workspace_widget_right = create_widgets(
+        Rc::clone(widgets_cache),
+        &user_config.sections.right,
+        &section_right,
+        user_config,
+        Arc::clone(event_state),
+        Rc::clone(is_window_visible),
+    );
+    has_workspace_widget_left || has_workspace_widget_center || has_workspace_widget_right
+}
+
 fn create_widgets(
+    widgets_cache: Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>>,
     widgets: &[String],
     container: &Rc<GtkBox>,
     config: &UserConfig,
@@ -197,21 +271,49 @@ fn create_widgets(
     is_visible: Rc<Cell<bool>>,
 ) -> bool {
     let mut has_workspace = false;
-
-    println!("Creating widgets: {:?}", widgets);
-    for widget in widgets.iter() {
-        if widget == "workspaces" {
+    let mut last_widget: Option<gtk::Widget> = None;
+    let mut active_widgets: HashSet<gtk::Widget> = HashSet::new();
+    for item in widgets.iter() {
+        if item == "workspaces" {
             has_workspace = true;
         }
-        get_widget(
-            widget,
-            container,
-            config,
-            Arc::clone(&event_state),
-            Rc::clone(&is_visible),
-        );
-    }
 
+        println!("Processing widget: {}", item);
+        println!("Current cache keys: {:?}", widgets_cache.borrow().keys());
+
+        let widget = widgets_cache
+            .borrow_mut()
+            .entry(item.to_string())
+            .or_insert_with(|| {
+                get_widget(
+                    item,
+                    config,
+                    Arc::clone(&event_state),
+                    Rc::clone(&is_visible),
+                )
+            })
+            .clone();
+        if let Some(parent) = widget.parent()
+            && parent != **container
+        {
+            widget.unparent();
+        }
+
+        widget.insert_after(&**container, last_widget.as_ref());
+
+        active_widgets.insert(widget.clone());
+
+        last_widget = Some(widget)
+    }
+    let mut child = container.first_child();
+    while let Some(current) = child {
+        let next = current.next_sibling();
+        if !active_widgets.contains(&current) {
+            current.unparent();
+        }
+
+        child = next;
+    }
     has_workspace
 }
 
@@ -263,41 +365,24 @@ pub fn hidden_bar_motion_controller(
 
 pub fn get_widget(
     name: &str,
-    container: &Rc<GtkBox>,
     config: &UserConfig,
     event_state: Arc<EventState>,
     is_visible: Rc<Cell<bool>>,
-) {
+) -> gtk::Widget {
     match name {
         "separator" => {
             let icon = config.widgets.get("separator").and_then(|w| w.icon.clone());
             let separator = gtk::Label::new(Some(icon.as_deref().unwrap_or("\u{f078}")));
             separator.add_css_class("separator");
-            container.append(&separator);
+            separator.into()
         }
-        "workspaces" => {
-            let container = Rc::clone(container);
-            let workspaces_box = GtkBox::new(Orientation::Horizontal, 5);
-            workspaces_box.add_css_class("workspaces-box");
-            container.append(&workspaces_box);
-            update_workspaces(&workspaces_box, None);
-
-            glib::timeout_add_local(Duration::from_millis(100), move || {
-                if event_state.pending_workspace.swap(false, Ordering::Relaxed) {
-                    update_workspaces(&workspaces_box, None);
-                } else if let Some(urgent_id) = event_state.pending_workspace_urgent.lock().take() {
-                    update_workspaces(&workspaces_box, Some(&urgent_id));
-                }
-                ControlFlow::Continue
-            });
-        }
+        "workspaces" => workspaces::workspaces_build(Arc::clone(&event_state)),
         "clock" => {
             let clock_container = gtk::Box::new(Orientation::Horizontal, 5);
             clock_container.add_css_class("clock-container");
             let clock_label =
                 gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
             clock_container.append(&clock_label);
-            container.append(&clock_container);
 
             let clock_label = Rc::new(clock_label);
             let is_visible = Rc::clone(&is_visible);
@@ -311,11 +396,12 @@ pub fn get_widget(
                     ControlFlow::Continue
                 }
             });
+
+            clock_container.into()
         }
         "title" => {
             let title_container = gtk::Box::new(Orientation::Horizontal, 5);
             title_container.add_css_class("title-container");
-            container.append(&title_container);
 
             let title_label = gtk::Label::new(Some("Titulo de ventana"));
             title_label.set_ellipsize(pango::EllipsizeMode::End);
@@ -329,6 +415,19 @@ pub fn get_widget(
                 }
                 ControlFlow::Continue
             });
+
+            title_container.into()
+        }
+        "settings" => {
+            let settings_button = gtk::Button::with_label("");
+            settings_button.add_css_class("settings-button");
+
+            let window = settings::render(Arc::clone(&event_state));
+            settings_button.connect_clicked(move |_| {
+                println!("Opening settings window");
+                window.present();
+            });
+            settings_button.into()
         }
         _ => {
             let button = config.custom_apps.get(name);
@@ -370,7 +469,9 @@ pub fn get_widget(
                     //set_popover(&btn, &vbox);
                 }
 
-                container.append(&btn)
+                btn.into()
+            } else {
+                gtk::Label::new(Some("Unknown")).into()
             }
         }
     }

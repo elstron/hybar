@@ -442,23 +442,13 @@ pub fn get_widget(
                 if let Some(cmd) = &button.cmd {
                     let cmd = cmd.clone();
 
-                    if cmd.contains(".desktop")
-                        && let Some(app) = gio::DesktopAppInfo::new(cmd.as_str())
-                    {
-                        app.launch(&[], None::<&gio::AppLaunchContext>)
-                            .expect("Failed to launch application");
-                    } else {
-                        btn.connect_clicked(move |_| {
-                            std::process::Command::new("sh")
-                                .arg("-c")
-                                .arg(&cmd)
-                                .current_dir(std::env::var("HOME").unwrap())
-                                .spawn()
-                                .expect("failed to execute process")
-                                .wait()
-                                .expect("failed to wait on child");
-                        });
-                    }
+                    btn.connect_clicked(move |_| {
+                        if let Some(app) = gio::DesktopAppInfo::new(&cmd) {
+                            let _ = app.launch(&[], None::<&gio::AppLaunchContext>);
+                        } else {
+                            let _ = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn();
+                        }
+                    });
                 }
                 if button.tooltip.unwrap_or(false) {
                     //let vbox = GtkBox::new(Orientation::Vertical, 5);

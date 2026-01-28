@@ -1,21 +1,14 @@
-use glib::ControlFlow::{self};
-use gtk::gdk::Cursor;
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box as GtkBox, Orientation, gio, pango};
-use gtk4_layer_shell::LayerShell;
-mod config;
-mod utils;
-mod widgets;
-use config::{hidden_layer_configuration, layer_shell_configure};
-use settings::HasPendingReload;
-use utils::css::load_css;
 mod client;
+mod config;
+mod ui;
 mod user;
-use chrono::Local;
-use client::hyprland_event_listener;
+mod utils;
+
+use glib::ControlFlow;
+use gtk::{Application, ApplicationWindow, prelude::*};
+use gtk4_layer_shell::LayerShell;
 use std::{
     cell::Cell,
-    collections::HashSet,
     env,
     path::PathBuf,
     rc::Rc,
@@ -26,22 +19,19 @@ use std::{
     time::Duration,
 };
 
+use client::hyprland_event_listener;
+use config::{hidden_layer_configuration, layer_shell_configure};
+use settings::HasPendingReload;
+use ui::{
+    sections::{BarSections, create_sections},
+    widgets::{sync_widgets_layout, widget_exists, workspaces::HasPendingWorkspace},
+};
 use user::config::load_config;
-use user::models::UserConfig;
-use widgets::workspaces;
-use widgets::workspaces::HasPendingWorkspace;
+use utils::css::load_css;
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 const DEBOUNCE_MS: u64 = 50;
-
-#[derive(Debug)]
-pub struct BarSections {
-    left: GtkBox,
-    right: GtkBox,
-    center: GtkBox,
-    container: GtkBox,
-}
 
 pub struct EventState {
     pending_workspace: AtomicBool,
@@ -126,7 +116,7 @@ async fn main() {
 
         let event_state = Arc::new(EventState::new());
 
-        let has_workspace_widget = build_widgets(
+        let has_workspace_widget = sync_widgets_layout(
             &widgets_cache,
             &user_config,
             Rc::clone(&section_left),
@@ -199,7 +189,7 @@ async fn main() {
                 println!("Reloading configuration...");
                 let new_config = load_config().unwrap_or_default();
 
-                build_widgets(
+                sync_widgets_layout(
                     &widgets_cache,
                     &new_config,
                     Rc::clone(&section_left),
@@ -217,100 +207,6 @@ async fn main() {
     });
 
     app.run();
-}
-
-pub fn build_widgets(
-    widgets_cache: &Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>>,
-    user_config: &UserConfig,
-    section_left: Rc<GtkBox>,
-    section_right: Rc<GtkBox>,
-    section_center: Rc<GtkBox>,
-    event_state: &Arc<EventState>,
-    is_window_visible: &Rc<Cell<bool>>,
-) -> bool {
-    let has_workspace_widget_left = create_widgets(
-        Rc::clone(widgets_cache),
-        &user_config.sections.left,
-        &section_left,
-        user_config,
-        Arc::clone(event_state),
-        Rc::clone(is_window_visible),
-    );
-    let has_workspace_widget_center = create_widgets(
-        Rc::clone(widgets_cache),
-        &user_config.sections.center,
-        &section_center,
-        user_config,
-        Arc::clone(event_state),
-        Rc::clone(is_window_visible),
-    );
-    let has_workspace_widget_right = create_widgets(
-        Rc::clone(widgets_cache),
-        &user_config.sections.right,
-        &section_right,
-        user_config,
-        Arc::clone(event_state),
-        Rc::clone(is_window_visible),
-    );
-    has_workspace_widget_left || has_workspace_widget_center || has_workspace_widget_right
-}
-
-fn create_widgets(
-    widgets_cache: Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>>,
-    widgets: &[String],
-    container: &Rc<GtkBox>,
-    config: &UserConfig,
-    event_state: Arc<EventState>,
-    is_visible: Rc<Cell<bool>>,
-) -> bool {
-    let mut has_workspace = false;
-    let mut last_widget: Option<gtk::Widget> = None;
-    let mut active_widgets: HashSet<gtk::Widget> = HashSet::new();
-    for item in widgets.iter() {
-        if item == "workspaces" {
-            has_workspace = true;
-        }
-
-        let widget = widgets_cache
-            .borrow_mut()
-            .entry(item.to_string())
-            .or_insert_with(|| {
-                get_widget(
-                    item,
-                    config,
-                    Arc::clone(&event_state),
-                    Rc::clone(&is_visible),
-                )
-            })
-            .clone();
-        if let Some(parent) = widget.parent()
-            && parent != **container
-        {
-            widget.unparent();
-        }
-
-        widget.insert_after(&**container, last_widget.as_ref());
-
-        active_widgets.insert(widget.clone());
-
-        last_widget = Some(widget)
-    }
-    let mut child = container.first_child();
-    while let Some(current) = child {
-        let next = current.next_sibling();
-        if !active_widgets.contains(&current) {
-            current.unparent();
-        }
-
-        child = next;
-    }
-    has_workspace
-}
-
-fn widget_exists(config: &UserConfig, widget_name: &str) -> bool {
-    config.sections.left.contains(&widget_name.to_string())
-        || config.sections.center.contains(&widget_name.to_string())
-        || config.sections.right.contains(&widget_name.to_string())
 }
 
 pub fn layer_motion_controller(
@@ -351,137 +247,6 @@ pub fn hidden_bar_motion_controller(
         bar_clone.set_focusable(true);
     });
     motion_controller
-}
-
-pub fn get_widget(
-    name: &str,
-    config: &UserConfig,
-    event_state: Arc<EventState>,
-    is_visible: Rc<Cell<bool>>,
-) -> gtk::Widget {
-    match name {
-        "separator" => {
-            let icon = config.widgets.get("separator").and_then(|w| w.icon.clone());
-            let separator = gtk::Label::new(Some(icon.as_deref().unwrap_or("\u{f078}")));
-            separator.add_css_class("separator");
-            separator.into()
-        }
-        "workspaces" => workspaces::workspaces_build(Arc::clone(&event_state)),
-        "clock" => {
-            let clock_container = gtk::Box::new(Orientation::Horizontal, 5);
-            clock_container.add_css_class("clock-container");
-            let clock_label =
-                gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
-            clock_container.append(&clock_label);
-
-            let clock_label = Rc::new(clock_label);
-            let is_visible = Rc::clone(&is_visible);
-            glib::timeout_add_local(std::time::Duration::from_secs(15), {
-                let clock_label = Rc::clone(&clock_label);
-                move || {
-                    if is_visible.get() {
-                        let now = chrono::Local::now();
-                        clock_label.set_label(&now.format("%I:%M %P").to_string());
-                    }
-                    ControlFlow::Continue
-                }
-            });
-
-            clock_container
-                .set_tooltip_markup(Some(&Local::now().format("%A, %B %d, %Y").to_string()));
-
-            clock_container.into()
-        }
-        "title" => {
-            let title_container = gtk::Box::new(Orientation::Horizontal, 5);
-            title_container.add_css_class("title-container");
-
-            let title_label = gtk::Label::new(Some(""));
-            title_label.set_ellipsize(pango::EllipsizeMode::End);
-            title_label.set_max_width_chars(100);
-            let title_label = Rc::new(title_label);
-            title_container.append(title_label.as_ref());
-
-            glib::timeout_add_local(Duration::from_millis(100), move || {
-                if let Some(new_title) = event_state.pending_title.lock().take() {
-                    title_label.set_text(&new_title);
-                }
-                ControlFlow::Continue
-            });
-
-            title_container.into()
-        }
-        "settings" => {
-            let settings_button = gtk::Button::with_label("");
-            settings_button.add_css_class("settings-button");
-
-            let window = settings::render(Arc::clone(&event_state));
-            settings_button.connect_clicked(move |_| {
-                println!("Opening settings window");
-                window.present();
-            });
-            settings_button.into()
-        }
-        _ => {
-            let button = config.custom_apps.get(name);
-            if let Some(button) = button {
-                let btn = match button.icon.as_deref() {
-                    Some(icon_name) => gtk::Button::with_label(icon_name),
-                    None => gtk::Button::from_icon_name(
-                        button.name.as_deref().unwrap_or("application-x-executable"),
-                    ),
-                };
-                btn.add_css_class("custom-app");
-
-                let cursor = Cursor::from_name("pointer", None);
-                btn.set_cursor(cursor.as_ref());
-
-                if let Some(cmd) = &button.cmd {
-                    let cmd = cmd.clone();
-
-                    btn.connect_clicked(move |_| {
-                        if let Some(app) = gio::DesktopAppInfo::new(&cmd) {
-                            let _ = app.launch(&[], None::<&gio::AppLaunchContext>);
-                        } else {
-                            let _ = std::process::Command::new("sh").arg("-c").arg(&cmd).spawn();
-                        }
-                    });
-                }
-                if button.tooltip.unwrap_or(true) {
-                    btn.set_tooltip_text(Some(button.name.as_deref().unwrap_or("")));
-                }
-
-                btn.into()
-            } else {
-                gtk::Label::new(Some("Unknown")).into()
-            }
-        }
-    }
-}
-fn create_sections() -> BarSections {
-    let section_left = gtk::Box::new(Orientation::Horizontal, 0);
-    section_left.set_halign(gtk::Align::Start);
-    let section_right = gtk::Box::new(Orientation::Horizontal, 0);
-    section_right.set_halign(gtk::Align::End);
-    let section_center = gtk::Box::new(Orientation::Horizontal, 0);
-    section_center.set_halign(gtk::Align::Center);
-    section_center.add_css_class("section-center");
-
-    let section_container = gtk::Box::new(Orientation::Horizontal, 10);
-    section_container.set_homogeneous(true);
-    section_container.set_halign(gtk::Align::Fill);
-    section_container.add_css_class("section-container");
-
-    section_left.set_hexpand(true);
-    section_center.set_hexpand(true);
-    section_right.set_hexpand(true);
-
-    BarSections {
-        left: section_left,
-        right: section_right,
-        center: section_center,
-        container: section_container,
-    }
 }
 
 pub fn get_hypr_socket_path() -> Option<PathBuf> {

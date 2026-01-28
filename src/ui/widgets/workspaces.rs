@@ -39,6 +39,7 @@ pub fn workspaces_build<S: HasPendingWorkspace + 'static>(event_state: Arc<S>) -
         }
         ControlFlow::Continue
     });
+
     workspaces_box.into()
 }
 

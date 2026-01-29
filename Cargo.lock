@@ -106,6 +106,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "calendar"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "glib",
+ "gtk4",
+ "gtk4-layer-shell",
+ "parking_lot",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -142,14 +153,6 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "windows-link",
-]
-
-[[package]]
-name = "clock"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "muelle-core",
 ]
 
 [[package]]
@@ -750,20 +753,18 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "clock",
  "dirs-next",
  "futures",
  "glib",
  "gtk4",
  "gtk4-layer-shell",
  "muelle-core",
+ "panels",
  "parking_lot",
  "serde",
  "serde_json",
- "settings",
  "tokio",
  "tokio-util",
- "toml",
 ]
 
 [[package]]
@@ -798,6 +799,14 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "panels"
+version = "0.1.0"
+dependencies = [
+ "calendar",
+ "settings",
+]
 
 [[package]]
 name = "pango"
@@ -1163,15 +1172,8 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_write",
  "winnow",
 ]
-
-[[package]]
-name = "toml_write"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "unicode-ident"

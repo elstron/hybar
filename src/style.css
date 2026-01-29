@@ -100,4 +100,43 @@ button.info {
   padding: 5px 10px;
 }
 
+.calendar-window {
+  background: #15141b;
+  border: 1px solid #222027;
+  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
+  border-radius: 10px;
+  padding: 10px;
+}
 
+.day-number:hover{
+  background-color: #e46c6c;
+  border-radius: 5px;
+}
+
+.day-number.other-month {
+  color: #555555;
+}
+
+.day-number.today {
+  background-color: #e46c6c;
+  border-radius: 5px;
+}
+
+.background.menu {
+  background-color: #15141b;
+  border: 1px solid #222027;
+  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
+  padding: 10px;
+}
+
+check {
+  margin-right: 10px;
+  background-color: transparent;
+  border: 1px solid #ffffff;
+  border-radius: 3px;
+}
+
+check:checked {
+  background-color: #e46c6c;
+  border: 1px solid #e46c6c;
+}

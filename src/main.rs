@@ -21,7 +21,7 @@ use std::{
 
 use client::hyprland_event_listener;
 use config::{hidden_layer_configuration, layer_shell_configure};
-use settings::HasPendingReload;
+use panels::settings::HasSettingsEvent;
 use ui::{
     sections::{BarSections, create_sections},
     widgets::{
@@ -62,7 +62,7 @@ impl HasPendingTitle for EventState {
     }
 }
 
-impl HasPendingReload for EventState {
+impl HasSettingsEvent for EventState {
     fn pending_reload(&self) -> &AtomicBool {
         &self.pending_reload
     }

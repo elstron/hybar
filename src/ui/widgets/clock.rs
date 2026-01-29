@@ -1,13 +1,17 @@
 use chrono::Local;
 use glib::ControlFlow;
-use gtk::{Orientation, prelude::*};
+use gtk::{Box as GtkBox, Button, Orientation, prelude::*};
 use std::{cell::Cell, rc::Rc};
 
 pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
-    let clock_container = gtk::Box::new(Orientation::Horizontal, 5);
-    clock_container.add_css_class("clock-container");
     let clock_label = gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
-    clock_container.append(&clock_label);
+
+    let clock_container = Button::builder()
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::Center)
+        .build();
+    clock_container.add_css_class("clock-container");
+    clock_container.set_child(Some(&clock_label));
 
     let clock_label = Rc::new(clock_label);
     let is_visible = Rc::clone(is_visible);
@@ -23,5 +27,14 @@ pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
     });
 
     clock_container.set_tooltip_markup(Some(&Local::now().format("%A, %B %d, %Y").to_string()));
+    let calendar_window = panels::calendar::render();
+    clock_container.connect_clicked(move |_| {
+        if calendar_window.is_visible() {
+            calendar_window.hide();
+        } else {
+            calendar_window.show();
+        }
+    });
+
     clock_container.into()
 }

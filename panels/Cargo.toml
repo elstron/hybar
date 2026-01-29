@@ -1,0 +1,11 @@
+[package]
+name = "panels"
+version = "0.1.0"
+edition = "2021"
+
+[lib] # Importante: es una librería
+path = "src/lib.rs"
+
+[dependencies]
+settings = { path = "settings" }
+calendar = { path = "calendar" }

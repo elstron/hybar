@@ -24,7 +24,7 @@ pub fn build_widget(
             let settings_button = gtk::Button::with_label("");
             settings_button.add_css_class("settings-button");
 
-            let window = settings::render(Arc::clone(&event_state));
+            let window = panels::settings::render(Arc::clone(&event_state));
             settings_button.connect_clicked(move |_| {
                 println!("Opening settings window");
                 window.present();

@@ -4,11 +4,11 @@ use gtk4_layer_shell::LayerShell;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-pub trait HasPendingReload: Send + Sync {
+pub trait HasSettingsEvent: Send + Sync {
     fn pending_reload(&self) -> &AtomicBool;
 }
 
-pub fn render<S: HasPendingReload + 'static>(state: Arc<S>) -> ApplicationWindow {
+pub fn render<S: HasSettingsEvent + 'static>(state: Arc<S>) -> ApplicationWindow {
     let settings_window = ApplicationWindow::builder()
         .title("Settings")
         .default_width(400)
@@ -29,13 +29,25 @@ pub fn render<S: HasPendingReload + 'static>(state: Arc<S>) -> ApplicationWindow
     settings_window
 }
 
-pub fn settings_panel<S: HasPendingReload + 'static>(
+pub fn settings_panel<S: HasSettingsEvent + 'static>(
     window: &ApplicationWindow,
     state: &Arc<S>,
 ) -> GtkBox {
     let vbox = GtkBox::new(Orientation::Vertical, 10);
 
     let feature_toggle = CheckButton::with_label("Enable Feature X");
+    feature_toggle.set_active(true);
+    feature_toggle.add_css_class("feature-toggle");
+
+    feature_toggle.connect_toggled(move |btn| {
+        println!("Feature X toggled");
+        if btn.is_active() {
+            println!("Feature X enabled");
+        } else {
+            println!("Feature X disabled");
+        }
+    });
+
     vbox.append(&feature_toggle);
 
     let option_dropdown = ComboBoxText::new();

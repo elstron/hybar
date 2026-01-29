@@ -1,5 +1,5 @@
-# Pendings Changes (H1)
+# Pendings Changes
 
-- [ ]Add logic to rename duplicate widgets in the JSON before returning their config
-- [ ]Do "match" for contains method instead of exact match for widget names
-- [ ]Move each widget logic to its own file
+- [x]Add logic to rename duplicate widgets in the JSON before returning their config
+- [x]Do "match" for contains method instead of exact match for widget names
+- [x]Move each widget logic to its own file

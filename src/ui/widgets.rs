@@ -1,9 +1,10 @@
 pub mod clock;
+pub mod separator;
+pub mod title;
 pub mod workspaces;
 
-use glib::ControlFlow;
-use gtk::{Box as GtkBox, Orientation, gdk::Cursor, gio, pango, prelude::*};
-use std::{cell::Cell, collections::HashSet, env, rc::Rc, sync::Arc, time::Duration};
+use gtk::{Box as GtkBox, gdk::Cursor, gio, prelude::*};
+use std::{cell::Cell, collections::HashSet, env, rc::Rc, sync::Arc};
 
 use crate::{EventState, user::models::UserConfig};
 
@@ -15,33 +16,10 @@ pub fn build_widget(
 ) -> gtk::Widget {
     let name = name.split('_').next().unwrap_or(name);
     match name {
-        "separator" => {
-            let icon = config.widgets.get("separator").and_then(|w| w.icon.clone());
-            let separator = gtk::Label::new(Some(icon.as_deref().unwrap_or("\u{f078}")));
-            separator.add_css_class("separator");
-            separator.into()
-        }
-        "workspaces" => workspaces::workspaces_build(Arc::clone(&event_state)),
+        "separator" => separator::render(config),
+        "workspaces" => workspaces::build(Arc::clone(&event_state)),
         "clock" => clock::render(&is_visible),
-        "title" => {
-            let title_container = gtk::Box::new(Orientation::Horizontal, 5);
-            title_container.add_css_class("title-container");
-
-            let title_label = gtk::Label::new(Some(""));
-            title_label.set_ellipsize(pango::EllipsizeMode::End);
-            title_label.set_max_width_chars(100);
-            let title_label = Rc::new(title_label);
-            title_container.append(title_label.as_ref());
-
-            glib::timeout_add_local(Duration::from_millis(100), move || {
-                if let Some(new_title) = event_state.pending_title.lock().take() {
-                    title_label.set_text(&new_title);
-                }
-                ControlFlow::Continue
-            });
-
-            title_container.into()
-        }
+        "title" => title::render(Arc::clone(&event_state)),
         "settings" => {
             let settings_button = gtk::Button::with_label("");
             settings_button.add_css_class("settings-button");

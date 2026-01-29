@@ -22,7 +22,7 @@ pub struct Workspace {
     pub lastwindow: String,
 }
 
-pub fn workspaces_build<S: HasPendingWorkspace + 'static>(event_state: Arc<S>) -> gtk::Widget {
+pub fn build<S: HasPendingWorkspace + 'static>(event_state: Arc<S>) -> gtk::Widget {
     let workspaces_box = GtkBox::new(gtk::Orientation::Horizontal, 5);
     workspaces_box.add_css_class("workspaces-box");
     update_workspaces(&workspaces_box, None);

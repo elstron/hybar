@@ -24,7 +24,9 @@ use config::{hidden_layer_configuration, layer_shell_configure};
 use settings::HasPendingReload;
 use ui::{
     sections::{BarSections, create_sections},
-    widgets::{sync_widgets_layout, widget_exists, workspaces::HasPendingWorkspace},
+    widgets::{
+        sync_widgets_layout, title::HasPendingTitle, widget_exists, workspaces::HasPendingWorkspace,
+    },
 };
 use user::config::load_config;
 use utils::css::load_css;
@@ -54,6 +56,12 @@ impl EventState {
         }
     }
 }
+impl HasPendingTitle for EventState {
+    fn pending_title(&self) -> &parking_lot::Mutex<Option<String>> {
+        &self.pending_title
+    }
+}
+
 impl HasPendingReload for EventState {
     fn pending_reload(&self) -> &AtomicBool {
         &self.pending_reload

@@ -16,7 +16,7 @@ pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
         move || {
             if is_visible.get() {
                 let now = chrono::Local::now();
-                clock_label.set_label(&now.format("%I:%M:%S %P").to_string());
+                clock_label.set_label(&now.format("%I:%M %P").to_string());
             }
             ControlFlow::Continue
         }

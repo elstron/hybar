@@ -1,14 +1,12 @@
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, Box as GtkBox, CheckButton, ComboBoxText, Orientation};
 use gtk4_layer_shell::LayerShell;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 pub trait HasSettingsEvent: Send + Sync {
-    fn pending_reload(&self) -> &AtomicBool;
+    fn pending_reload(&self);
 }
 
-pub fn render<S: HasSettingsEvent + 'static>(state: Arc<S>) -> ApplicationWindow {
+pub fn render<S: HasSettingsEvent + 'static>(state: S) -> ApplicationWindow {
     let settings_window = ApplicationWindow::builder()
         .title("Settings")
         .default_width(400)
@@ -21,7 +19,7 @@ pub fn render<S: HasSettingsEvent + 'static>(state: Arc<S>) -> ApplicationWindow
     settings_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
     settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
 
-    let settings_panel = settings_panel(&settings_window, &state.clone());
+    let settings_panel = settings_panel(&settings_window, state);
 
     settings_window.set_child(Some(&settings_panel));
     settings_window.add_css_class("settings-window");
@@ -31,7 +29,7 @@ pub fn render<S: HasSettingsEvent + 'static>(state: Arc<S>) -> ApplicationWindow
 
 pub fn settings_panel<S: HasSettingsEvent + 'static>(
     window: &ApplicationWindow,
-    state: &Arc<S>,
+    state: S,
 ) -> GtkBox {
     let vbox = GtkBox::new(Orientation::Vertical, 10);
 
@@ -70,12 +68,10 @@ pub fn settings_panel<S: HasSettingsEvent + 'static>(
         window_clone.hide();
     });
 
-    let state_clone = state.clone();
+    let state_clone = state;
     reload_button.connect_clicked(move |_| {
         println!("Reloading settings...");
-        state_clone
-            .pending_reload()
-            .store(true, std::sync::atomic::Ordering::SeqCst);
+        state_clone.pending_reload()
     });
 
     vbox.append(&option_dropdown);

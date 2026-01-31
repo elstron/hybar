@@ -1,6 +1,7 @@
 use crate::DEBOUNCE_MS;
 use crate::EventState;
 use crate::HYPRLAND_SUBSCRIPTION;
+use crate::UiEvent;
 use crate::get_hypr_socket_path;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -8,7 +9,10 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
-pub async fn hyprland_event_listener(event_state: Arc<EventState>) {
+pub async fn hyprland_event_listener(
+    event_state: Arc<EventState>,
+    sender: async_channel::Sender<UiEvent>,
+) {
     let path = match get_hypr_socket_path() {
         Some(p) => p,
         None => {
@@ -20,7 +24,9 @@ pub async fn hyprland_event_listener(event_state: Arc<EventState>) {
     loop {
         match UnixStream::connect(&path).await {
             Ok(stream) => {
-                if let Err(e) = connect_to_hyprland_socket(stream, event_state.clone()).await {
+                if let Err(e) =
+                    connect_to_hyprland_socket(stream, event_state.clone(), sender.clone()).await
+                {
                     eprintln!("Connection to Hyprland socket lost: {}", e);
                 }
             }
@@ -36,6 +42,7 @@ pub async fn hyprland_event_listener(event_state: Arc<EventState>) {
 async fn connect_to_hyprland_socket(
     mut stream: UnixStream,
     event_state: Arc<EventState>,
+    sender: async_channel::Sender<UiEvent>,
 ) -> std::io::Result<UnixStream> {
     println!("Connected to Hyprland socket");
 
@@ -97,25 +104,25 @@ async fn connect_to_hyprland_socket(
                 let mut needs_gtk_update = false;
 
                 if has_workspace_update {
-                    event_state.pending_workspace.store(true, Ordering::Relaxed);
+                    sender.send(UiEvent::WorkspaceChanged).await.ok();
                     has_workspace_update = false;
                     needs_gtk_update = true;
                 }
 
                 if has_fullscreen_update {
-                    event_state.pending_fullscreen.store(true, Ordering::Relaxed);
-                    event_state.is_fullscreen.store(is_fullscreen, Ordering::Relaxed);
+                    sender.send(UiEvent::FullscreenChanged(is_fullscreen)).await.ok();
                     has_fullscreen_update = false;
                     needs_gtk_update = true;
                 }
 
                 if let Some(title) = latest_title.take() {
+                    sender.send(UiEvent::TitleChanged(title.clone())).await.ok();
                     *event_state.pending_title.lock() = Some(title);
                     needs_gtk_update = true;
                 }
 
                 if let Some(urgent_id) = has_workspace_urgent.take() {
-                    *event_state.pending_workspace_urgent.lock() = Some(urgent_id);
+                    sender.send(UiEvent::WorkspaceUrgent(urgent_id.clone())).await.ok();
                     has_workspace_update = false;
                     needs_gtk_update = true;
                 }

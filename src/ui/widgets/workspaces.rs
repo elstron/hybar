@@ -1,19 +1,9 @@
-use glib::ControlFlow;
 use gtk::gdk::Cursor;
 use gtk::prelude::*;
 use gtk::{Box as GtkBox, GestureClick, Label};
 use serde::Deserialize;
 use std::process::Command;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-
 const ANY_BUTTON: u32 = 0;
-
-pub trait HasPendingWorkspace: Send + Sync {
-    fn pending_workspace(&self) -> &AtomicBool;
-    fn pending_workspace_urgent(&self) -> &parking_lot::Mutex<Option<String>>;
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Workspace {
@@ -22,25 +12,32 @@ pub struct Workspace {
     pub lastwindow: String,
 }
 
-pub fn build<S: HasPendingWorkspace + 'static>(event_state: Arc<S>) -> gtk::Widget {
-    let workspaces_box = GtkBox::new(gtk::Orientation::Horizontal, 5);
-    workspaces_box.add_css_class("workspaces-box");
-    update_workspaces(&workspaces_box, None);
+pub struct WorkspacesWidget {
+    root: GtkBox,
+}
 
-    let workspaces_box_clone = workspaces_box.clone();
-    glib::timeout_add_local(Duration::from_millis(100), move || {
-        if event_state
-            .pending_workspace()
-            .swap(false, Ordering::Relaxed)
-        {
-            update_workspaces(&workspaces_box_clone, None);
-        } else if let Some(urgent_id) = event_state.pending_workspace_urgent().lock().take() {
-            update_workspaces(&workspaces_box_clone, Some(&urgent_id));
+impl WorkspacesWidget {
+    pub fn new() -> Self {
+        let root = GtkBox::new(gtk::Orientation::Horizontal, 5);
+        root.add_css_class("workspaces-box");
+        update_workspaces(&root, None);
+        Self { root }
+    }
+
+    pub fn widget(&self) -> &GtkBox {
+        &self.root
+    }
+
+    pub fn update(&self, urgent: Option<String>) {
+        match urgent {
+            Some(id) => {
+                update_workspaces(&self.root, Some(&id));
+            }
+            None => {
+                update_workspaces(&self.root, None);
+            }
         }
-        ControlFlow::Continue
-    });
-
-    workspaces_box.into()
+    }
 }
 
 pub fn get_workspaces() -> Vec<Workspace> {

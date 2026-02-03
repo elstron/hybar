@@ -3,15 +3,19 @@ pub mod separator;
 pub mod title;
 pub mod workspaces;
 
-use gtk::{Box as GtkBox, gdk::Cursor, gio, prelude::*};
-use std::{cell::Cell, collections::HashSet, env, rc::Rc, sync::Arc};
+use gtk::{Box as GtkBox, Image, gdk::Cursor, gio, prelude::*};
+use std::{cell::Cell, collections::HashSet, env, path::Path, rc::Rc, sync::Arc};
 
-use crate::{EventState, UiEventState, user::models::UserConfig};
+use crate::{
+    EventState, UiEventState,
+    user::models::{SectionsConfig, UserConfig},
+};
 
 pub struct Widgets {
     pub workspaces: workspaces::WorkspacesWidget,
     pub clock: gtk::Widget,
     pub title: title::TitleWidget,
+    pub apps: gtk::Widget,
 }
 
 pub struct WidgetsBuilder {
@@ -38,6 +42,7 @@ impl WidgetsBuilder {
                 workspaces: workspaces::WorkspacesWidget::new(),
                 clock: clock::render(&is_visible),
                 title: title::TitleWidget::new(),
+                apps: gtk::Box::new(gtk::Orientation::Horizontal, 0).into(),
             },
             widgets_cache: Rc::new(std::cell::RefCell::new(std::collections::HashMap::new())),
             sender,
@@ -51,6 +56,22 @@ impl WidgetsBuilder {
             "workspaces" => self.widgets.workspaces.widget().clone().into(),
             "clock" => self.widgets.clock.clone(),
             "title" => self.widgets.title.widget().clone(),
+            "apps" => {
+                let container = &self.widgets.apps;
+                container.add_css_class("apps-container");
+
+                for app in &self
+                    .user_config
+                    .widgets
+                    .get("apps")
+                    .and_then(|w| w.favorites.as_ref())
+                    .cloned()
+                    .unwrap_or_default()
+                {
+                    self.create_widget_app(app, false);
+                }
+                container.clone()
+            }
             "settings" => {
                 let settings_button = gtk::Button::with_label("");
                 settings_button.add_css_class("settings-button");
@@ -96,6 +117,7 @@ impl WidgetsBuilder {
                         btn.set_tooltip_text(Some(button.name.as_deref().unwrap_or("")));
                     }
 
+                    btn.set_widget_name(button.name.as_deref().unwrap_or("custom-app"));
                     btn.into()
                 } else {
                     gtk::Label::new(Some("Unknown")).into()
@@ -110,12 +132,16 @@ impl WidgetsBuilder {
         section_right: Rc<GtkBox>,
         section_center: Rc<GtkBox>,
     ) -> bool {
-        let left =
-            self.sync_section_widgets(&section_left, self.user_config.sections.left.as_slice());
-        let center =
-            self.sync_section_widgets(&section_center, self.user_config.sections.center.as_slice());
-        let right =
-            self.sync_section_widgets(&section_right, self.user_config.sections.right.as_slice());
+        let SectionsConfig {
+            left,
+            right,
+            center,
+        } = &self.user_config.sections;
+
+        let left = self.sync_section_widgets(&section_left, left.as_slice());
+        let center = self.sync_section_widgets(&section_center, center.as_slice());
+        let right = self.sync_section_widgets(&section_right, right.as_slice());
+
         left || center || right
     }
 
@@ -158,23 +184,81 @@ impl WidgetsBuilder {
     }
 
     pub fn widget_exists(&self, widget_name: &str) -> bool {
-        self.user_config
-            .sections
-            .left
-            .contains(&widget_name.to_string())
-            || self
-                .user_config
-                .sections
-                .center
-                .contains(&widget_name.to_string())
-            || self
-                .user_config
-                .sections
-                .right
-                .contains(&widget_name.to_string())
+        let SectionsConfig {
+            left,
+            right,
+            center,
+        } = &self.user_config.sections;
+
+        left.contains(&widget_name.to_string())
+            || center.contains(&widget_name.to_string())
+            || right.contains(&widget_name.to_string())
     }
 
     pub fn update_config(&mut self, user_config: Rc<UserConfig>) {
         self.user_config = user_config;
+    }
+
+    pub fn create_widget_app(&self, app_name: &str, is_opened: bool) {
+        println!("Creating app button for: {}", app_name);
+        let button = gtk::Button::from_icon_name(app_name);
+        let icon_theme = gtk::IconTheme::for_display(&gtk::gdk::Display::default().unwrap());
+        let found_icon = icon_theme.has_icon(app_name);
+
+        if !found_icon {
+            button.set_child(Some(&self.load_icon(app_name, 16)));
+        }
+
+        println!("Found icon for app: {:?}", found_icon);
+        button.add_css_class("app-button");
+
+        if is_opened {
+            button.add_css_class("opened");
+        }
+
+        let cursor = Cursor::from_name("pointer", None);
+        button.set_cursor(cursor.as_ref());
+        let app_clone = app_name.to_string();
+        button.connect_clicked(move |_| {
+            if let Some(app) = gio::DesktopAppInfo::new(&app_clone) {
+                let _ = app.launch(&[], None::<&gio::AppLaunchContext>);
+            } else {
+                let _ = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&app_clone)
+                    .current_dir(env::var("HOME").unwrap())
+                    .spawn();
+            }
+        });
+        button.set_tooltip_text(Some(app_name));
+        button.set_widget_name(app_name);
+        button.add_css_class("app-button");
+
+        self.widgets
+            .apps
+            .clone()
+            .downcast::<gtk::Box>()
+            .unwrap()
+            .append(&button);
+    }
+
+    pub fn load_icon(&self, icon_name: &str, size: i32) -> Image {
+        println!("Loading icon: {}", icon_name);
+        let image = if icon_name.contains('/')
+            || icon_name.ends_with(".png")
+            || icon_name.ends_with(".svg")
+            || icon_name.ends_with(".xpm")
+        {
+            if Path::new(icon_name).exists() {
+                Image::from_file(icon_name)
+            } else {
+                Image::new()
+            }
+        } else {
+            Image::from_icon_name(icon_name)
+        };
+
+        image.set_pixel_size(size);
+        image
     }
 }

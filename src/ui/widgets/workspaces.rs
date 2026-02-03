@@ -25,6 +25,7 @@ impl WorkspacesWidget {
     }
 
     pub fn widget(&self) -> &GtkBox {
+        let _ = &self.root.set_widget_name("workspaces");
         &self.root
     }
 

@@ -82,6 +82,11 @@
 .custom-app:hover {
   color: #e46c6c;
 }
+
+.app-button.opened {
+  border-bottom: 2px solid #e46c6c;
+}
+
 .clock-container {
 }
 

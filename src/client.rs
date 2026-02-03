@@ -4,7 +4,6 @@ use crate::HYPRLAND_SUBSCRIPTION;
 use crate::UiEvent;
 use crate::get_hypr_socket_path;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
@@ -63,11 +62,13 @@ async fn connect_to_hyprland_socket(
     let mut has_fullscreen_update = false;
     let mut latest_title: Option<String> = None;
     let mut has_workspace_urgent: Option<String> = None;
+    let mut has_open_window: Option<String> = None;
     loop {
         tokio::select! {
             line_result = lines.next_line() => {
                 match line_result {
                     Ok(Some(line)) => {
+                        println!("Hyprland event: {}", line);
                         if line.contains("\"change\":") || line.contains("workspace") {
                             has_workspace_update = true;
                         }
@@ -87,6 +88,11 @@ async fn connect_to_hyprland_socket(
                             let urgent_id = line[start + 9..].trim().to_string();
                             has_workspace_urgent = Some(urgent_id);
                             has_workspace_update = true;
+                        }
+
+                        if line.contains("openwindow>>") {
+                            let window_name = line.split(",").nth(2).unwrap_or("").trim().to_string();
+                            has_open_window = Some(window_name);
                         }
                     }
                     Ok(None) => {
@@ -124,6 +130,11 @@ async fn connect_to_hyprland_socket(
                 if let Some(urgent_id) = has_workspace_urgent.take() {
                     sender.send(UiEvent::WorkspaceUrgent(urgent_id.clone())).await.ok();
                     has_workspace_update = false;
+                    needs_gtk_update = true;
+                }
+
+                if let Some(_window_name) = has_open_window.take() {
+                    sender.send(UiEvent::WindowOpened(_window_name)).await.ok();
                     needs_gtk_update = true;
                 }
 

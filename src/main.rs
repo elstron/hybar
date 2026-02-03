@@ -3,20 +3,9 @@ mod config;
 mod ui;
 mod user;
 mod utils;
-use glib::ControlFlow;
 use gtk::{Application, ApplicationWindow, prelude::*};
 use gtk4_layer_shell::LayerShell;
-use std::{
-    cell::Cell,
-    env,
-    path::PathBuf,
-    rc::Rc,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use std::{cell::Cell, env, path::PathBuf, rc::Rc, sync::Arc};
 
 use client::hyprland_event_listener;
 use config::{hidden_layer_configuration, layer_shell_configure};
@@ -39,6 +28,8 @@ pub enum UiEvent {
     FullscreenChanged(bool),
     TitleChanged(String),
     ReloadSettings,
+    WindowOpened(String),
+    WindowClosed(String),
 }
 
 pub struct EventState {
@@ -195,6 +186,20 @@ async fn main() {
                     UiEvent::WorkspaceUrgent(urgent) => {
                         widgets_builder.widgets.workspaces.update(Some(urgent))
                     }
+                    UiEvent::WindowOpened(window_name) => {
+                        let widget =
+                            find_child_by_name(&widgets_builder.widgets.apps, &window_name);
+
+                        if let Some(widget) = widget {
+                            println!("Adding opened class to widget: {}", widget.widget_name());
+                            widget.add_css_class("opened");
+                        } else {
+                            widgets_builder.create_widget_app(&window_name, true);
+                        }
+                    }
+                    UiEvent::WindowClosed(window_name) => {
+                        println!("Window closed event for: {}", window_name);
+                    }
                 }
             }
         });
@@ -203,6 +208,20 @@ async fn main() {
     });
 
     app.run();
+}
+
+fn find_child_by_name(box_: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
+    let mut child = box_.first_child();
+    println!("Searching for widget with name: {}", name);
+    while let Some(widget) = child {
+        println!("Checking widget: {}", widget.widget_name());
+        if widget.widget_name() == name {
+            return Some(widget);
+        }
+        child = widget.next_sibling();
+    }
+
+    None
 }
 
 pub fn layer_motion_controller(

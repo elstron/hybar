@@ -28,7 +28,7 @@ pub enum UiEvent {
     FullscreenChanged(bool),
     TitleChanged(String),
     ReloadSettings,
-    WindowOpened(String),
+    WindowOpened((String, String)),
     WindowClosed(String),
 }
 
@@ -186,19 +186,35 @@ async fn main() {
                     UiEvent::WorkspaceUrgent(urgent) => {
                         widgets_builder.widgets.workspaces.update(Some(urgent))
                     }
-                    UiEvent::WindowOpened(window_name) => {
-                        let widget =
-                            find_child_by_name(&widgets_builder.widgets.apps, &window_name);
+                    UiEvent::WindowOpened((window_name, id)) => {
+                        println!("Window opened event for: {} with id: {}", &window_name, &id);
+                        let widget = find_child_by_name_or_id(
+                            &widgets_builder.widgets.apps,
+                            &window_name,
+                            &id,
+                        );
 
                         if let Some(widget) = widget {
-                            println!("Adding opened class to widget: {}", widget.widget_name());
                             widget.add_css_class("opened");
                         } else {
-                            widgets_builder.create_widget_app(&window_name, true);
+                            widgets_builder.create_widget_app(&window_name, &id, true);
                         }
                     }
-                    UiEvent::WindowClosed(window_name) => {
-                        println!("Window closed event for: {}", window_name);
+                    UiEvent::WindowClosed(id) => {
+                        let widget =
+                            find_child_by_name_or_id(&widgets_builder.widgets.apps, "", &id);
+                        if let Some(widget) = widget {
+                            widget.set_widget_name(
+                                widget
+                                    .widget_name()
+                                    .replace(&format!("_{}", id), "")
+                                    .as_str(),
+                            );
+
+                            if !widget.widget_name().contains("_") {
+                                widget.remove_css_class("opened");
+                            }
+                        }
                     }
                 }
             }
@@ -210,15 +226,35 @@ async fn main() {
     app.run();
 }
 
-fn find_child_by_name(box_: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
+struct ClientInfo {
+    pub name: String,
+}
+
+fn active_clients(name: &str) {
+    let output = std::process::Command::new("hyprctl")
+        .arg("clients")
+        .output()
+        .expect("Failed to execute hyprctl clients command");
+    let _ = String::from_utf8_lossy(&output.stdout);
+}
+
+fn find_child_by_name_or_id(box_: &gtk::Widget, name: &str, id: &str) -> Option<gtk::Widget> {
     let mut child = box_.first_child();
-    println!("Searching for widget with name: {}", name);
     while let Some(widget) = child {
-        println!("Checking widget: {}", widget.widget_name());
-        if widget.widget_name() == name {
-            return Some(widget);
+        let name = if name.is_empty() { id } else { name };
+        let has_name = widget.widget_name().contains(name);
+        let has_id = widget.widget_name().contains(id);
+
+        if !has_name {
+            child = widget.next_sibling();
+            continue;
         }
-        child = widget.next_sibling();
+
+        if !has_id {
+            widget.set_widget_name(&format!("{}_{}", widget.widget_name(), id));
+        }
+
+        return Some(widget);
     }
 
     None

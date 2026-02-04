@@ -62,13 +62,13 @@ async fn connect_to_hyprland_socket(
     let mut has_fullscreen_update = false;
     let mut latest_title: Option<String> = None;
     let mut has_workspace_urgent: Option<String> = None;
-    let mut has_open_window: Option<String> = None;
+    let mut has_open_window: Option<(String, String)> = None;
+    let mut has_close_window: Option<String> = None;
     loop {
         tokio::select! {
             line_result = lines.next_line() => {
                 match line_result {
                     Ok(Some(line)) => {
-                        println!("Hyprland event: {}", line);
                         if line.contains("\"change\":") || line.contains("workspace") {
                             has_workspace_update = true;
                         }
@@ -91,8 +91,24 @@ async fn connect_to_hyprland_socket(
                         }
 
                         if line.contains("openwindow>>") {
-                            let window_name = line.split(",").nth(2).unwrap_or("").trim().to_string();
-                            has_open_window = Some(window_name);
+                            let data = line.strip_prefix("openwindow>>").unwrap();
+
+                            let mut parts = data.split(",");
+                            let app_id = parts.next().unwrap_or("").to_string();
+                            let _ = parts.next();
+                            let window_name = parts.next().unwrap_or("").trim().to_string();
+
+
+                            println!("Opened window: {} ({})", window_name, app_id);
+                            has_open_window = Some(
+                                (window_name.to_lowercase(), app_id)
+                            );
+                        }
+
+                        if line.contains("closewindow>>") {
+                            let app_id = line.split(">>").nth(1).unwrap_or("").to_string();
+                            println!("Closed window: {}", app_id);
+                            has_close_window = Some(app_id);
                         }
                     }
                     Ok(None) => {
@@ -133,8 +149,13 @@ async fn connect_to_hyprland_socket(
                     needs_gtk_update = true;
                 }
 
-                if let Some(_window_name) = has_open_window.take() {
-                    sender.send(UiEvent::WindowOpened(_window_name)).await.ok();
+                if let Some((name, id)) = has_open_window.take() {
+                    sender.send(UiEvent::WindowOpened((name, id))).await.ok();
+                    needs_gtk_update = true;
+                }
+
+                if let Some(id) = has_close_window.take() {
+                    sender.send(UiEvent::WindowClosed(id)).await.ok();
                     needs_gtk_update = true;
                 }
 

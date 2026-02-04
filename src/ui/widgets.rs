@@ -9,6 +9,7 @@ use std::{cell::Cell, collections::HashSet, env, path::Path, rc::Rc, sync::Arc};
 use crate::{
     EventState, UiEventState,
     user::models::{SectionsConfig, UserConfig},
+    utils::app_launch::app_lauch,
 };
 
 pub struct Widgets {
@@ -68,7 +69,7 @@ impl WidgetsBuilder {
                     .cloned()
                     .unwrap_or_default()
                 {
-                    self.create_widget_app(app, false);
+                    self.create_widget_app(app, "", false);
                 }
                 container.clone()
             }
@@ -99,28 +100,20 @@ impl WidgetsBuilder {
 
                     if let Some(cmd) = &button.cmd {
                         let cmd = cmd.clone();
-
                         btn.connect_clicked(move |_| {
-                            if let Some(app) = gio::DesktopAppInfo::new(&cmd) {
-                                let _ = app.launch(&[], None::<&gio::AppLaunchContext>);
-                                println!("Launching application: {}", cmd);
-                            } else {
-                                let _ = std::process::Command::new("sh")
-                                    .arg("-c")
-                                    .arg(&cmd)
-                                    .current_dir(env::var("HOME").unwrap())
-                                    .spawn();
-                            }
+                            app_lauch(&cmd);
                         });
                     }
                     if button.tooltip.unwrap_or(true) {
-                        btn.set_tooltip_text(Some(button.name.as_deref().unwrap_or("")));
+                        let text = button.name.as_deref().unwrap_or("");
+                        btn.set_tooltip_text(Some(text));
                     }
 
-                    btn.set_widget_name(button.name.as_deref().unwrap_or("custom-app"));
+                    let name = button.name.as_deref().unwrap_or("custom-app");
+                    btn.set_widget_name(name);
                     btn.into()
                 } else {
-                    gtk::Label::new(Some("Unknown")).into()
+                    gtk::Label::new(Some("")).into()
                 }
             }
         }
@@ -199,40 +192,43 @@ impl WidgetsBuilder {
         self.user_config = user_config;
     }
 
-    pub fn create_widget_app(&self, app_name: &str, is_opened: bool) {
-        println!("Creating app button for: {}", app_name);
+    pub fn create_widget_app(&self, app_name: &str, id: &str, is_opened: bool) {
         let button = gtk::Button::from_icon_name(app_name);
-        let icon_theme = gtk::IconTheme::for_display(&gtk::gdk::Display::default().unwrap());
-        let found_icon = icon_theme.has_icon(app_name);
-
-        if !found_icon {
-            button.set_child(Some(&self.load_icon(app_name, 16)));
-        }
-
-        println!("Found icon for app: {:?}", found_icon);
+        button.set_cursor(Cursor::from_name("pointer", None).as_ref());
+        button.set_tooltip_text(Some(app_name));
+        button.set_widget_name(app_name);
         button.add_css_class("app-button");
 
         if is_opened {
             button.add_css_class("opened");
         }
 
-        let cursor = Cursor::from_name("pointer", None);
-        button.set_cursor(cursor.as_ref());
+        if !id.is_empty() {
+            button.set_widget_name(format!("{}_{}", app_name, id).as_str());
+        }
+
+        let icon_theme = gtk::IconTheme::for_display(&gtk::gdk::Display::default().unwrap());
+        let found_icon = icon_theme.has_icon(app_name);
+
+        let mut exec = None;
+        if !found_icon {
+            use crate::utils::search::search_desktop_file;
+            let icon_name = if let Some(desktop_file) = search_desktop_file(app_name) {
+                exec = Some(desktop_file.exec.clone());
+                desktop_file
+                    .icon
+                    .unwrap_or_else(|| "application-x-executable".to_string())
+            } else {
+                "application-x-executable".to_string()
+            };
+            button.set_child(Some(&self.load_icon(&icon_name, 16)));
+        }
+
         let app_clone = app_name.to_string();
         button.connect_clicked(move |_| {
-            if let Some(app) = gio::DesktopAppInfo::new(&app_clone) {
-                let _ = app.launch(&[], None::<&gio::AppLaunchContext>);
-            } else {
-                let _ = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(&app_clone)
-                    .current_dir(env::var("HOME").unwrap())
-                    .spawn();
-            }
+            let exec_cmd = exec.clone().unwrap_or(app_clone.clone());
+            app_lauch(&exec_cmd);
         });
-        button.set_tooltip_text(Some(app_name));
-        button.set_widget_name(app_name);
-        button.add_css_class("app-button");
 
         self.widgets
             .apps

@@ -204,6 +204,8 @@ async fn main() {
                         let widget =
                             find_child_by_name_or_id(&widgets_builder.widgets.apps, "", &id);
                         if let Some(widget) = widget {
+                            let widget_name = &widget.widget_name().to_string();
+
                             widget.set_widget_name(
                                 widget
                                     .widget_name()
@@ -213,6 +215,23 @@ async fn main() {
 
                             if !widget.widget_name().contains("_") {
                                 widget.remove_css_class("opened");
+
+                                let is_favorite =
+                                    user_config.widgets.get("apps").is_some_and(|app_config| {
+                                        app_config.favorites.clone().is_some_and(|favorites| {
+                                            favorites.contains(widget_name)
+                                        })
+                                    });
+
+                                if !is_favorite {
+                                    widgets_builder
+                                        .widgets
+                                        .apps
+                                        .clone()
+                                        .downcast::<gtk::Box>()
+                                        .unwrap()
+                                        .remove(&widget);
+                                }
                             }
                         }
                     }

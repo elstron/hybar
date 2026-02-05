@@ -3,8 +3,8 @@ pub mod separator;
 pub mod title;
 pub mod workspaces;
 
-use gtk::{Box as GtkBox, Image, gdk::Cursor, gio, prelude::*};
-use std::{cell::Cell, collections::HashSet, env, path::Path, rc::Rc, sync::Arc};
+use gtk::{Box as GtkBox, Image, gdk::Cursor, prelude::*};
+use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,

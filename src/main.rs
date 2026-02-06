@@ -1,5 +1,6 @@
 mod client;
 mod config;
+mod models;
 mod ui;
 mod user;
 mod utils;
@@ -187,6 +188,7 @@ async fn main() {
                         widgets_builder.widgets.workspaces.update(Some(urgent))
                     }
                     UiEvent::WindowOpened((window_name, id)) => {
+                        widgets_builder.update_active_clients();
                         println!("Window opened event for: {} with id: {}", &window_name, &id);
                         let widget = find_child_by_name_or_id(
                             &widgets_builder.widgets.apps,
@@ -201,19 +203,17 @@ async fn main() {
                         }
                     }
                     UiEvent::WindowClosed(id) => {
+                        widgets_builder.update_active_clients();
                         let widget =
                             find_child_by_name_or_id(&widgets_builder.widgets.apps, "", &id);
                         if let Some(widget) = widget {
-                            let widget_name = &widget.widget_name().to_string();
+                            let formatted_id = format!("_{}", id);
+                            let widget_name =
+                                &widget.widget_name().replace(formatted_id.as_str(), "");
+                            println!("Window closed event for widget: {}", widget_name);
+                            widget.set_widget_name(widget_name);
 
-                            widget.set_widget_name(
-                                widget
-                                    .widget_name()
-                                    .replace(&format!("_{}", id), "")
-                                    .as_str(),
-                            );
-
-                            if !widget.widget_name().contains("_") {
+                            if !widget_name.contains("_") {
                                 widget.remove_css_class("opened");
 
                                 let is_favorite =
@@ -243,18 +243,6 @@ async fn main() {
     });
 
     app.run();
-}
-
-struct ClientInfo {
-    pub name: String,
-}
-
-fn active_clients(name: &str) {
-    let output = std::process::Command::new("hyprctl")
-        .arg("clients")
-        .output()
-        .expect("Failed to execute hyprctl clients command");
-    let _ = String::from_utf8_lossy(&output.stdout);
 }
 
 fn find_child_by_name_or_id(box_: &gtk::Widget, name: &str, id: &str) -> Option<gtk::Widget> {

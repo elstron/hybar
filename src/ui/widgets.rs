@@ -8,8 +8,12 @@ use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
+    models::clients::Client,
     user::models::{SectionsConfig, UserConfig},
-    utils::app_launch::app_lauch,
+    utils::{
+        app_launch::app_lauch,
+        clients::{self, focus_client},
+    },
 };
 
 pub struct Widgets {
@@ -25,6 +29,7 @@ pub struct WidgetsBuilder {
     is_visible: Rc<Cell<bool>>,
     pub widgets: Widgets,
     widgets_cache: Rc<std::cell::RefCell<std::collections::HashMap<String, gtk::Widget>>>,
+    active_clients: Rc<std::cell::RefCell<Vec<Client>>>,
     sender: UiEventState,
 }
 
@@ -46,6 +51,9 @@ impl WidgetsBuilder {
                 apps: gtk::Box::new(gtk::Orientation::Horizontal, 0).into(),
             },
             widgets_cache: Rc::new(std::cell::RefCell::new(std::collections::HashMap::new())),
+            active_clients: Rc::new(std::cell::RefCell::new(
+                clients::active_clients().unwrap_or_default(),
+            )),
             sender,
         }
     }
@@ -203,8 +211,22 @@ impl WidgetsBuilder {
             button.add_css_class("opened");
         }
 
+        let clients = self.active_clients.borrow();
+        let app_clients_active = clients
+            .iter()
+            .filter(|c| c.class.to_lowercase().contains(app_name));
+
+        let has_active_client = app_clients_active.clone().count() >= 1;
+
         if !id.is_empty() {
             button.set_widget_name(format!("{}_{}", app_name, id).as_str());
+        } else if has_active_client {
+            button.add_css_class("opened");
+            let mut widget_name = app_name.to_string();
+            for client in app_clients_active {
+                widget_name.push_str(format!("_{}", &client.address.replace("0x", "")).as_str());
+            }
+            button.set_widget_name(widget_name.as_str());
         }
 
         let icon_theme = gtk::IconTheme::for_display(&gtk::gdk::Display::default().unwrap());
@@ -225,9 +247,22 @@ impl WidgetsBuilder {
         }
 
         let app_clone = app_name.to_string();
+        let app_clients = Rc::clone(&self.active_clients);
+
         button.connect_clicked(move |_| {
             let exec_cmd = exec.clone().unwrap_or(app_clone.clone());
-            app_lauch(&exec_cmd);
+            let clients = app_clients.borrow();
+            let mut iter = clients
+                .iter()
+                .filter(|c| c.class.to_lowercase().contains(&app_clone.to_lowercase()));
+
+            match (iter.next(), iter.next()) {
+                (Some(_), Some(_)) => {
+                    println!("Hay 2 o mas clients: {}", app_clone);
+                }
+                (Some(client), None) => focus_client(client),
+                (None, _) => app_lauch(&exec_cmd),
+            }
         });
 
         self.widgets
@@ -236,6 +271,10 @@ impl WidgetsBuilder {
             .downcast::<gtk::Box>()
             .unwrap()
             .append(&button);
+    }
+
+    pub fn update_active_clients(&self) {
+        *self.active_clients.borrow_mut() = clients::active_clients().unwrap_or_default();
     }
 
     pub fn load_icon(&self, icon_name: &str, size: i32) -> Image {

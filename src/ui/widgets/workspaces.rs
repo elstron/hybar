@@ -76,19 +76,14 @@ pub fn update_workspaces(container: &GtkBox, urgent_id: Option<&String>) {
         if let Some(active) = &active_ws {
             if ws.id == active.id {
                 label.add_css_class("workspace-active");
-                label.set_text("\u{f192}");
             } else if let Some(urgent) = urgent_id
                 && ws.lastwindow.contains(urgent)
             {
                 label.add_css_class("workspace-urgent");
-                label.set_text("\u{f111}");
             } else {
                 label.add_css_class("workspace");
                 label.set_text("\u{f111}");
             }
-        } else {
-            label.add_css_class("workspace");
-            label.set_text("\u{f111}");
         }
         let cursor = Cursor::from_name("pointer", None);
 

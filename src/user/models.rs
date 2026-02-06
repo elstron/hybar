@@ -32,6 +32,7 @@ pub struct SectionsConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct WidgetsConfig {
+    pub favorites: Option<Vec<String>>,
     pub icon: Option<String>,
     pub size: Option<u32>,
     pub format: Option<String>,

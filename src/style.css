@@ -46,11 +46,13 @@
 .workspace-urgent {
   padding: 5px;
   margin: 0 5px;
-  font-size: 10px;
+  font-size: 5px;
   background-color: transparent;
   transition: background-color 0.8s ease;
 }
-
+.workspace-active, .workspace-urgent {
+  font-size: 13px;
+}
 .workspace-active {
   color: #ffffff;
   font-weight: bold;
@@ -66,7 +68,7 @@
 
 .workspace-active {
   border: none;
-  color: #e46c6c;
+  color: #ffffff;
 }
 
 .separator {
@@ -82,6 +84,11 @@
 .custom-app:hover {
   color: #e46c6c;
 }
+
+.app-button.opened {
+  border-bottom: 2px solid #e46c6c;
+}
+
 .clock-container {
 }
 

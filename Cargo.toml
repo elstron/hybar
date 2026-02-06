@@ -18,6 +18,7 @@ tokio-util = "0.7"
 futures = "0.3"
 async-trait = "0.1.88"
 dirs-next = "2"
+async-channel = "2.5.0"
 
 [workspace]
 members = ["muelle-core", "panels"]

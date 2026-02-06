@@ -1,6 +1,6 @@
 use chrono::Local;
 use glib::ControlFlow;
-use gtk::{Box as GtkBox, Button, Orientation, prelude::*};
+use gtk::{Button, prelude::*};
 use std::{cell::Cell, rc::Rc};
 
 pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {

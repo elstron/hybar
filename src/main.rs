@@ -140,7 +140,6 @@ async fn main() {
         hidden_window.add_controller(motion_controller_for_hidden_window.clone());
 
         if !user_config.bar.autohide {
-            println!("Autohide disabled");
             hidden_window.set_focusable(false);
             window.set_focusable(false);
 
@@ -189,7 +188,6 @@ async fn main() {
                     }
                     UiEvent::WindowOpened((window_name, id)) => {
                         widgets_builder.update_active_clients();
-                        println!("Window opened event for: {} with id: {}", &window_name, &id);
                         let widget = find_child_by_name_or_id(
                             &widgets_builder.widgets.apps,
                             &window_name,

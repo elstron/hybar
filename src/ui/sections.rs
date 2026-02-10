@@ -11,8 +11,12 @@ pub struct BarSections {
 pub fn create_sections() -> BarSections {
     let section_left = gtk::Box::new(Orientation::Horizontal, 0);
     section_left.set_halign(gtk::Align::Start);
+    section_left.add_css_class("section-left");
+
     let section_right = gtk::Box::new(Orientation::Horizontal, 0);
     section_right.set_halign(gtk::Align::End);
+    section_right.add_css_class("section-right");
+
     let section_center = gtk::Box::new(Orientation::Horizontal, 0);
     section_center.set_halign(gtk::Align::Center);
     section_center.add_css_class("section-center");

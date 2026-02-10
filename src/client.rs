@@ -69,6 +69,7 @@ async fn connect_to_hyprland_socket(
             line_result = lines.next_line() => {
                 match line_result {
                     Ok(Some(line)) => {
+                        println!("Received event: {}", line);
                         if line.contains("\"change\":") || line.contains("workspace") {
                             has_workspace_update = true;
                         }
@@ -80,7 +81,13 @@ async fn connect_to_hyprland_socket(
 
                         if line.contains("activewindow>>")
                             && let Some(title_start) = line.find(">>") {
-                            latest_title = Some(line[title_start + 2..].trim().to_string());
+                            let mut title = line[title_start + 2..].trim().to_string();
+
+                            if (title == ",") || (title == " - ") || (title.is_empty()) {
+                                title = "".to_string();
+                            }
+
+                            latest_title = Some(title);
                         }
 
                         if line.contains("urgent>>")

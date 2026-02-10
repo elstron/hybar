@@ -15,7 +15,7 @@ pub fn render() -> ApplicationWindow {
     calendar_window.set_anchor(gtk4_layer_shell::Edge::Left, false);
     calendar_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
     calendar_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
-
+    calendar_window.set_namespace(Some("muelle:calendar"));
     calendar_window.add_css_class("calendar-window");
 
     let calendar = Calendar::new();

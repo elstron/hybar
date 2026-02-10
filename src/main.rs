@@ -84,8 +84,8 @@ async fn main() {
             .build();
         LayerShell::init_layer_shell(&hidden_window);
 
-        hidden_layer_configuration(&hidden_window);
-        layer_shell_configure(&window);
+        hidden_layer_configuration(&hidden_window, Rc::clone(&user_config));
+        layer_shell_configure(&window, Rc::clone(&user_config));
 
         let BarSections {
             left: section_left,

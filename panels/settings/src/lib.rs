@@ -18,6 +18,7 @@ pub fn render<S: HasSettingsEvent + 'static>(state: S) -> ApplicationWindow {
     settings_window.set_anchor(gtk4_layer_shell::Edge::Left, false);
     settings_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
     settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
+    settings_window.set_namespace(Some("muelle:settings"));
 
     let settings_panel = settings_panel(&settings_window, state);
 

@@ -21,6 +21,7 @@ pub struct UiConfig {
 pub struct BarConfig {
     pub height: u32,
     pub autohide: bool,
+    pub position: String,
 }
 
 #[derive(Debug, Deserialize, Default)]

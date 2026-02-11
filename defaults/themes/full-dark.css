@@ -16,7 +16,7 @@
   background: black;
 }
 
-.settings-window, .player-window {
+.settings-window, .player-window,.calendar-window {
   background: #15141b;
   border: 1px solid #222027;
   box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
@@ -27,21 +27,18 @@
 .section-container {
   margin-left: 20px;
   margin-right: 20px;
-  background: transparent;
+  background: #15141b;
   margin-bottom: 5px;
   border-radius: 10px;
   padding-left: 10px;
   padding-right: 10px;
-
+  border: 1px solid #222027;
+  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
 }
 
 .section-center, .section-left, .section-right {
-  background: #15141b;
   margin: 5px 10px;
   padding: 0 20px;
-  border: 1px solid #222027;
-  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
-  border-radius: 10px;
 }
 
 .workspace,
@@ -110,14 +107,6 @@ button.info {
   padding: 5px 10px;
 }
 
-.calendar-window {
-  background: #15141b;
-  border: 1px solid #222027;
-  box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
-  border-radius: 10px;
-  padding: 10px;
-}
-
 .day-number:hover{
   background-color: #e46c6c;
   border-radius: 5px;
@@ -150,13 +139,3 @@ check:checked {
   background-color: #e46c6c;
   border: 1px solid #e46c6c;
 }
-
-
-/* Window Player  */
-
-.song-label {
-  font-size: 14px;
-  font-weight: bold;
-  color: #ffffff;
-}
-

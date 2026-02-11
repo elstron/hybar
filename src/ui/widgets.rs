@@ -65,6 +65,19 @@ impl WidgetsBuilder {
             "workspaces" => self.widgets.workspaces.widget().clone().into(),
             "clock" => self.widgets.clock.clone(),
             "title" => self.widgets.title.widget().clone(),
+            "player" => {
+                let button = gtk::Button::with_label("");
+                button.add_css_class("player-button");
+                let player = panels::player::build_ui();
+                button.connect_clicked(move |_| {
+                    if player.is_visible() {
+                        player.hide();
+                    } else {
+                        player.present();
+                    }
+                });
+                button.into()
+            }
             "apps" => {
                 let container = &self.widgets.apps;
                 container.add_css_class("apps-container");

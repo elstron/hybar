@@ -1,12 +1,15 @@
 [package]
-name = "muelle-core"
+name = "player"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
+[lib] # Importante: es una librería
 path = "src/lib.rs"
 
 [dependencies]
+mpris = "2.0"
 gtk = { version = "0.9", package = "gtk4" }
-async-trait = "0.1.88"
+gtk4-layer-shell = "0.5.0"
+glib = "0.20.12"
 parking_lot = "0.12"
+async-channel = "2.5.0"

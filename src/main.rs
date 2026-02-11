@@ -9,7 +9,7 @@ use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, env, path::PathBuf, rc::Rc, sync::Arc};
 
 use client::hyprland_event_listener;
-use config::{hidden_layer_configuration, layer_shell_configure};
+use config::{bootstrap::bootstrap_config, hidden_layer_configuration, layer_shell_configure};
 use panels::settings::HasSettingsEvent;
 use ui::{
     fullscreen::handle_fullscreen_visibility,
@@ -59,27 +59,29 @@ impl HasSettingsEvent for UiEventState {
 }
 #[tokio::main]
 async fn main() {
-    let app = Application::builder()
-        .application_id("com.example.scale")
-        .build();
+    let app = Application::builder().application_id("com.hybar").build();
 
     app.connect_activate(|app| {
-        load_css();
+        if let Err(e) = bootstrap_config() {
+            eprintln!("Error inicializando configuración: {e}");
+        }
 
         let user_config = load_config().unwrap_or_default();
         let bar_height = 20;
         let user_config = Rc::new(user_config);
 
+        load_css(&user_config.theme);
+
         let window = ApplicationWindow::builder()
             .application(app)
-            .title("Animación de Escala")
+            .title("hybar")
             .default_height(bar_height)
             .build();
         LayerShell::init_layer_shell(&window);
 
         let hidden_window = ApplicationWindow::builder()
             .application(app)
-            .title("hidden window")
+            .title("hidden hybar")
             .default_height(2)
             .build();
         LayerShell::init_layer_shell(&hidden_window);

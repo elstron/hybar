@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct UserConfig {
+    pub theme: String,
     pub ui: UiConfig,
     pub bar: BarConfig,
     pub sections: SectionsConfig,

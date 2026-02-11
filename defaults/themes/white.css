@@ -1,7 +1,7 @@
 * {
   all: unset;
   background-color: transparent;
-  color: #ffffff;
+  color: black;
   font-family: 'JetBrainsMono Nerd Font', monospace;
   font-size: 13px;
   font-weight: bold;
@@ -17,8 +17,8 @@
 }
 
 .settings-window, .player-window {
-  background: #15141b;
-  border: 1px solid #222027;
+  background: #ffffff;
+  border: 1px solid #dddddd;
   box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
   border-radius: 10px;
   padding: 10px;
@@ -36,10 +36,10 @@
 }
 
 .section-center, .section-left, .section-right {
-  background: #15141b;
+  background: #ffffff;
   margin: 5px 10px;
   padding: 0 20px;
-  border: 1px solid #222027;
+  border: 1px solid #dddddd;
   box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
   border-radius: 10px;
 }
@@ -57,7 +57,7 @@
   font-size: 13px;
 }
 .workspace-active {
-  color: #ffffff;
+  color: #000000;
   font-weight: bold;
   transition: color 0.8s ease;
 }
@@ -71,12 +71,12 @@
 
 .workspace-active {
   border: none;
-  color: #ffffff;
+  color: #000000;
 }
 
 .separator {
   margin: 0 10px;
-  color: #555555;
+  color: #000000;
 }
 
 .custom-app, button {
@@ -85,11 +85,11 @@
 }
 
 .custom-app:hover {
-  color: #e46c6c;
+  color: #ff5555;
 }
 
 .app-button.opened {
-  border-bottom: 2px solid #e46c6c;
+  border-bottom: 2px solid #ff5555;
 }
 
 .clock-container {
@@ -111,8 +111,8 @@ button.info {
 }
 
 .calendar-window {
-  background: #15141b;
-  border: 1px solid #222027;
+  background: #ffffff;
+  border: 1px solid #dddddd;
   box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
   border-radius: 10px;
   padding: 10px;
@@ -133,8 +133,8 @@ button.info {
 }
 
 .background.menu {
-  background-color: #15141b;
-  border: 1px solid #222027;
+  background-color: #ffffff;
+  border: 1px solid #dddddd;
   box-shadow: 1px 2px 8px -1px rgba(7,7,7,0.74);
   padding: 10px;
 }
@@ -142,13 +142,13 @@ button.info {
 check {
   margin-right: 10px;
   background-color: transparent;
-  border: 1px solid #ffffff;
+  border: 1px solid #000000;
   border-radius: 3px;
 }
 
 check:checked {
-  background-color: #e46c6c;
-  border: 1px solid #e46c6c;
+  background-color: #000000;
+  border: 1px solid #000000;
 }
 
 
@@ -157,6 +157,6 @@ check:checked {
 .song-label {
   font-size: 14px;
   font-weight: bold;
-  color: #ffffff;
+  color: #000000;
 }
 

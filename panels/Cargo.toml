@@ -9,3 +9,4 @@ path = "src/lib.rs"
 [dependencies]
 settings = { path = "settings" }
 calendar = { path = "calendar" }
+player = { path = "player" }

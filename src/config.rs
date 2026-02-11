@@ -1,7 +1,8 @@
 use std::rc::Rc;
+pub mod bootstrap;
 
+use gtk::ApplicationWindow;
 use gtk::prelude::WidgetExt;
-use gtk::{ApplicationWindow, prelude::StyleContextExt};
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 use crate::user::models::UserConfig;
@@ -63,23 +64,4 @@ pub fn set_position(window: &ApplicationWindow, position: &str) {
         }
         _ => {}
     }
-}
-
-pub fn set_background_color(window: &ApplicationWindow, bg_color: &str) {
-    let css = format!(
-        r#"
-        .bg_color {{
-            background-color: {};
-        }}
-        "#,
-        bg_color
-    );
-
-    let provider = gtk::CssProvider::new();
-    provider.load_from_data(css.as_str());
-
-    window
-        .style_context()
-        .add_provider(&provider, gtk::STYLE_PROVIDER_PRIORITY_USER);
-    window.add_css_class("bg_color");
 }

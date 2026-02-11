@@ -1,0 +1,12 @@
+[package]
+name = "hybar-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+gtk = { version = "0.9", package = "gtk4" }
+async-trait = "0.1.88"
+parking_lot = "0.12"

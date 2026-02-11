@@ -1,0 +1,83 @@
+{
+  "theme": "default",
+  "ui": {
+    "padding": {
+      "left": 10,
+      "right": 10,
+      "top": 0,
+      "bottom": 0
+    },
+    "margin": {
+      "left": 0,
+      "right": 0,
+      "top": 0,
+      "bottom": 0
+    },
+    "border": {
+      "width": 0,
+      "color": "#00000000"
+    },
+    "opacity": 0.9
+  },
+  "bar": {
+    "height": 32,
+    "autohide": false,
+    "position": "top",
+    "monitor": "primary",
+    "exclusive": true
+  },
+  "sections": {
+    "left": ["workspaces", "separator", "title"],
+    "center": ["launcher", "separator", "apps"],
+    "right": ["clock"]
+  },
+  "widgets": {
+    "separator": {
+      "icon": "•",
+      "size": 10
+    },
+    "clock": {
+      "format": "HH:mm",
+      "timezone": "local"
+    },
+    "workspaces": {
+      "show_icons": true,
+      "max_workspaces": 10
+    },
+    "datetime": {
+      "format": "ddd, MMM DD  |  HH:mm",
+      "timezone": "local"
+    },
+    "apps": {
+      "favorites": ["firefox", "chromium", "kitty", "code", "discord"]
+    }
+  },
+  "custom_apps": {
+    "browser": {
+      "icon": null,
+      "name": "firefox",
+      "cmd": "firefox --new-window"
+    },
+    "terminal": {
+      "icon": null,
+      "name": "kitty",
+      "cmd": "kitty"
+    },
+    "launcher": {
+      "icon": "",
+      "name": "launcher_app",
+      "cmd": "rofi -show drun",
+      "tooltip": false
+    },
+    "chrome": {
+      "icon": null,
+      "name": "chromium",
+      "cmd": "chromium --new-window"
+    },
+    "code": {
+      "icon": "vscode",
+      "name": "code",
+      "cmd": "code"
+    }
+  }
+}

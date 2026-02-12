@@ -26,19 +26,30 @@ jobs:
           gdk-pixbuf2 \
           gtk3 \
           gtk4 \
-          gtk-layer-shell \
           pkg-config \
           glib2 \
           libpulse \
           libxcb \
           xcb-util \
-          wayland
+          wayland \
+          meson \
+          ninja \
+          gobject-introspection \
+          vala
     
     - name: Create build user
       run: |
         useradd -m builder
         echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
         chown -R builder:builder .
+    
+    - name: Install gtk4-layer-shell from AUR
+      run: |
+        cd /tmp
+        su - builder -c "cd /tmp && git clone https://aur.archlinux.org/gtk4-layer-shell.git"
+        chown -R builder:builder /tmp/gtk4-layer-shell
+        cd gtk4-layer-shell
+        su - builder -c "cd /tmp/gtk4-layer-shell && makepkg -si --noconfirm"
     
     - name: Build package from build/PKGBUILD
       run: |

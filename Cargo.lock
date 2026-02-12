@@ -1270,9 +1270,12 @@ name = "settings"
 version = "0.1.0"
 dependencies = [
  "async-channel",
+ "directories",
+ "dirs-next",
  "glib",
  "gtk4",
  "gtk4-layer-shell",
+ "include_dir",
  "parking_lot",
 ]
 

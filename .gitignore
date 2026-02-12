@@ -1,3 +1,10 @@
 /target
-/build
 **/target
+
+build/src/
+build/pkg/
+# ignore tar files
+*.tar
+*.tar.gz
+*.tgz
+*.tar.zst

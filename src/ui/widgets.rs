@@ -98,7 +98,8 @@ impl WidgetsBuilder {
                 let settings_button = gtk::Button::with_label("");
                 settings_button.add_css_class("settings-button");
 
-                let window = panels::settings::render(self.sender.clone());
+                let settings = panels::settings::SettingsPanel::new(self.sender.clone());
+                let window = settings.render();
                 settings_button.connect_clicked(move |_| {
                     println!("Opening settings window");
                     window.present();

@@ -19,6 +19,8 @@ use ui::{
 use user::config::load_config;
 use utils::css::load_css;
 
+use user::models::UserConfig;
+
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 const DEBOUNCE_MS: u64 = 50;
@@ -31,15 +33,17 @@ pub enum UiEvent {
     ReloadSettings,
     WindowOpened((String, String)),
     WindowClosed(String),
+    ThemeChanged(String),
 }
 
 pub struct EventState {
     pending_title: parking_lot::Mutex<Option<String>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UiEventState {
     sender: async_channel::Sender<UiEvent>,
+    theme: String,
 }
 
 impl EventState {
@@ -56,7 +60,18 @@ impl HasSettingsEvent for UiEventState {
             .try_send(UiEvent::ReloadSettings)
             .unwrap_or_else(|e| eprintln!("Failed to send reload settings event: {}", e));
     }
+
+    fn pending_theme_change(&self, theme: String) {
+        self.sender
+            .try_send(UiEvent::ThemeChanged(theme))
+            .unwrap_or_else(|e| eprintln!("Failed to send theme change event: {}", e));
+    }
+
+    fn get_default_theme(&self) -> String {
+        self.theme.clone()
+    }
 }
+
 #[tokio::main]
 async fn main() {
     let app = Application::builder().application_id("com.hybar").build();
@@ -107,6 +122,7 @@ async fn main() {
 
         let sender_event = UiEventState {
             sender: sender.clone(),
+            theme: user_config.theme.clone(),
         };
         let mut widgets_builder = WidgetsBuilder::new(
             Rc::clone(&user_config),
@@ -182,6 +198,7 @@ async fn main() {
                             Rc::clone(&section_center),
                         );
                     }
+                    UiEvent::ThemeChanged(theme) => load_css(&theme),
                     UiEvent::WorkspaceChanged => {
                         widgets_builder.widgets.workspaces.update(None);
                     }

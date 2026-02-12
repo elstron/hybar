@@ -7,9 +7,8 @@ use std::path::{Path, PathBuf};
 static DEFAULTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/defaults");
 
 pub fn bootstrap_config() -> Result<PathBuf, Box<dyn Error>> {
-    // Obtener directorio de config según estándar XDG
     let proj_dirs = ProjectDirs::from("com", "stron", "hybar")
-        .ok_or("No se pudo determinar el directorio de configuración")?;
+        .ok_or("The config directory could not be determined.")?;
 
     let config_dir = proj_dirs.config_dir();
 

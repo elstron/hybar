@@ -20,7 +20,19 @@ jobs:
     - name: Update system and install dependencies
       run: |
         pacman -Syu --noconfirm
-        pacman -S --noconfirm base-devel rust cargo git
+        pacman -S --noconfirm base-devel rust cargo git \
+          cairo \
+          pango \
+          gdk-pixbuf2 \
+          gtk3 \
+          gtk4 \
+          gtk-layer-shell \
+          pkg-config \
+          glib2 \
+          libpulse \
+          libxcb \
+          xcb-util \
+          wayland
     
     - name: Create build user
       run: |

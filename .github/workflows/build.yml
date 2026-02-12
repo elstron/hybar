@@ -1,0 +1,41 @@
+name: Build PKGBUILD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Update system and install dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm base-devel rust cargo git
+    
+    - name: Create build user
+      run: |
+        useradd -m builder
+        echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+        chown -R builder:builder .
+    
+    - name: Build package from build/PKGBUILD
+      run: |
+        cd build
+        su - builder -c "cd $(pwd) && makepkg -sf --noconfirm"
+    
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: hybar-package
+        path: 'build/*.pkg.tar.zst'
+        retention-days: 30

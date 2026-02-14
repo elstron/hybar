@@ -29,7 +29,7 @@
   "sections": {
     "left": ["workspaces", "separator", "title"],
     "center": ["launcher", "separator", "apps"],
-    "right": ["clock"]
+    "right": ["player", "separator", "clock"]
   },
   "widgets": {
     "separator": {

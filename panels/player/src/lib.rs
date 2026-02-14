@@ -5,7 +5,7 @@ use gtk4_layer_shell::LayerShell;
 use mpris::{PlaybackStatus, PlayerFinder};
 use std::time::Duration;
 
-pub fn build_ui() -> ApplicationWindow {
+pub fn build_ui() -> (ApplicationWindow, Label) {
     let window = ApplicationWindow::builder()
         .title("Hybar player")
         .default_width(350)
@@ -89,7 +89,7 @@ pub fn build_ui() -> ApplicationWindow {
         glib::ControlFlow::Continue
     });
 
-    window
+    (window, status_label)
 }
 
 fn control_media(command: &str) {

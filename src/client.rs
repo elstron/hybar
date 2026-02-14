@@ -69,7 +69,6 @@ async fn connect_to_hyprland_socket(
             line_result = lines.next_line() => {
                 match line_result {
                     Ok(Some(line)) => {
-                        println!("Received event: {}", line);
                         if line.contains("\"change\":") || line.contains("workspace") {
                             has_workspace_update = true;
                         }

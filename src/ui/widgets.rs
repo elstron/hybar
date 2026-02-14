@@ -66,15 +66,20 @@ impl WidgetsBuilder {
             "clock" => self.widgets.clock.clone(),
             "title" => self.widgets.title.widget().clone(),
             "player" => {
-                let button = gtk::Button::with_label("");
+                let (player, status) = panels::player::build_ui();
+                let button = gtk::Button::with_label(&status.text());
+
+                let button_clone = button.clone();
+                status.connect_notify_local(Some("label"), move |status, _| {
+                    button_clone.set_label(&status.text());
+                });
+
                 button.add_css_class("player-button");
-                let player = panels::player::build_ui();
-                button.connect_clicked(move |_| {
-                    if player.is_visible() {
-                        player.hide();
-                    } else {
-                        player.present();
-                    }
+                button.set_child(Some(&status));
+
+                button.connect_clicked(move |_| match player.is_visible() {
+                    true => player.hide(),
+                    false => player.present(),
                 });
                 button.into()
             }
@@ -271,9 +276,8 @@ impl WidgetsBuilder {
                 .filter(|c| c.class.to_lowercase().contains(&app_clone.to_lowercase()));
 
             match (iter.next(), iter.next()) {
-                (Some(_), Some(_)) => {
-                    println!("Hay 2 o mas clients: {}", app_clone);
-                }
+                // temporary solution for multiple clients, should be improved in the future
+                (Some(client), Some(_)) => focus_client(client),
                 (Some(client), None) => focus_client(client),
                 (None, _) => app_lauch(&exec_cmd),
             }

@@ -19,8 +19,6 @@ use ui::{
 use user::config::load_config;
 use utils::css::load_css;
 
-use user::models::UserConfig;
-
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 const DEBOUNCE_MS: u64 = 50;

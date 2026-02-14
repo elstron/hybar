@@ -1,16 +1,17 @@
-# MUELLE - A Hyprland Taskbar
+# HyBar - A Hyprland Taskbar
 
-**Muelle** is a **custom status bar for Wayland/Hyprland** written in Rust. It is a graphical interface project that provides a top bar with widgets and system information. It is an alternative inspired by Waybar but designed for the Hyprland compositor.
+**HyBar** is a **custom status bar for Wayland/Hyprland** written in Rust. It is a graphical interface project that provides a top bar with widgets and system information. It is an alternative inspired by Waybar but designed for the Hyprland compositor.
 
 ### **Features:**
 
 - Monitoring of active and urgent workspaces and changes
 - AutoHide in full-screen mode
 - Three bar sections: left, center, and right
-- Configuration system using JSON (`config.json`)
-- Custom CSS styles
+- Configuration system using JSON (`.config/hybar/config.json`)
+- Custom CSS Themes on the fly (`.config/hybar/themes/`)
 - Hot reload system (work in progress...)
 - **AutoHide** mode.
+- Dock mode, shows active apps, favorites.
 
 ### **Architecture**
 

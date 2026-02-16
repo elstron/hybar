@@ -6,7 +6,7 @@ mod user;
 mod utils;
 use gtk::{Application, ApplicationWindow, prelude::*};
 use gtk4_layer_shell::LayerShell;
-use std::{cell::Cell, env, path::PathBuf, rc::Rc, sync::Arc};
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use client::hyprland_event_listener;
 use config::{bootstrap::bootstrap_config, hidden_layer_configuration, layer_shell_configure};
@@ -322,37 +322,20 @@ pub fn hidden_bar_motion_controller(
     motion_controller
 }
 
-pub fn get_hypr_socket_path() -> Option<PathBuf> {
-    let runtime_dir = env::var("XDG_RUNTIME_DIR").ok()?;
-    let instance = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
-    Some(
-        PathBuf::from(runtime_dir)
-            .join("hypr")
-            .join(instance)
-            .join(".socket2.sock"),
-    )
-}
-
 pub fn set_popover(button: &gtk::Button, child: gtk::Widget) {
     let popover = gtk::Popover::builder()
         .child(&child)
         .has_arrow(true)
+        .autohide(true)
         .position(gtk::PositionType::Bottom)
         .build();
 
+    popover.add_css_class("popover");
     popover.set_parent(button);
 
-    let motion = gtk::EventControllerMotion::new();
-
     let popover_show = popover.clone();
-    motion.connect_enter(move |_, _, _| {
-        popover_show.present();
-    });
 
-    let popover_hide = popover.clone();
-    motion.connect_leave(move |_| {
-        popover_hide.popdown();
+    button.connect_clicked(move |_| {
+        popover_show.popup();
     });
-
-    button.add_controller(motion);
 }

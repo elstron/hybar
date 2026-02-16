@@ -46,14 +46,14 @@ impl SettingsPanel {
         let settings_window = self.window.clone();
 
         LayerShell::init_layer_shell(&settings_window);
+
+        settings_window.auto_exclusive_zone_enable();
         settings_window.set_layer(gtk4_layer_shell::Layer::Overlay);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Right, true);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Left, false);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
-        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
+        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
         settings_window.set_namespace(Some("hybar:settings"));
-        //settings_window.set_decorated(false);
-        //settings_window.add_css_class("transparent-window");
         let settings_panel = self.settings_panel();
 
         settings_window.set_child(Some(&settings_panel));
@@ -63,18 +63,15 @@ impl SettingsPanel {
     }
 
     fn settings_panel(&self) -> GtkBox {
-        let vbox = GtkBox::new(Orientation::Vertical, 10);
+        let vbox = GtkBox::new(Orientation::Vertical, 20);
 
         let feature_toggle = CheckButton::with_label("Enable Feature X");
         feature_toggle.set_active(true);
         feature_toggle.add_css_class("feature-toggle");
 
-        feature_toggle.connect_toggled(move |btn| {
-            if btn.is_active() {
-                println!("Feature X enabled");
-            } else {
-                println!("Feature X disabled");
-            }
+        feature_toggle.connect_toggled(move |btn| match btn.is_active() {
+            true => println!("Feature X enabled"),
+            false => println!("Feature X disabled"),
         });
 
         vbox.append(&feature_toggle);
@@ -130,7 +127,9 @@ impl SettingsPanel {
         themes
     }
 
-    fn select_theme(&self) -> ComboBoxText {
+    fn select_theme(&self) -> GtkBox {
+        let hbox = GtkBox::new(Orientation::Horizontal, 5);
+        let label = gtk::Label::new(Some("Select Theme:"));
         let option_dropdown = ComboBoxText::new();
         let themes = self.themes_list();
         for (i, theme) in themes.iter().enumerate() {
@@ -148,7 +147,10 @@ impl SettingsPanel {
                 }
             }
         });
-        option_dropdown
+        hbox.append(&label);
+        hbox.append(&option_dropdown);
+        hbox.add_css_class("section");
+        hbox
     }
 
     fn save_settings(&self) {

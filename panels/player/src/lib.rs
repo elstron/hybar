@@ -1,24 +1,11 @@
 use gtk::glib;
 use gtk::prelude::*;
-use gtk::{Align, ApplicationWindow, Box, Button, Label, Orientation};
-use gtk4_layer_shell::LayerShell;
+use gtk::{Align, Box, Button, Label, Orientation};
 use mpris::{PlaybackStatus, PlayerFinder};
 use std::time::Duration;
 
-pub fn build_ui() -> (ApplicationWindow, Label) {
-    let window = ApplicationWindow::builder()
-        .title("Hybar player")
-        .default_width(350)
-        .default_height(150)
-        .build();
-    LayerShell::init_layer_shell(&window);
-    window.set_layer(gtk4_layer_shell::Layer::Overlay);
-    window.set_anchor(gtk4_layer_shell::Edge::Right, true);
-    window.set_anchor(gtk4_layer_shell::Edge::Left, false);
-    window.set_anchor(gtk4_layer_shell::Edge::Top, true);
-    window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
-    window.set_namespace(Some("hybar:player"));
-    window.add_css_class("player-window");
+pub fn build_ui() -> (gtk::Widget, Label) {
+    let window = gtk::Box::new(Orientation::Vertical, 0);
 
     let vbox = Box::new(Orientation::Vertical, 10);
     vbox.set_margin_top(20);
@@ -55,7 +42,7 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
     vbox.append(&scrolled_window);
     vbox.append(&hbox_buttons);
 
-    window.set_child(Some(&vbox));
+    window.append(&vbox);
 
     let btn_play_clone = btn_play.clone();
     btn_play.connect_clicked(move |_| {
@@ -89,7 +76,7 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
         glib::ControlFlow::Continue
     });
 
-    (window, status_label)
+    (window.into(), status_label)
 }
 
 fn control_media(command: &str) {

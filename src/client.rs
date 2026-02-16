@@ -2,7 +2,8 @@ use crate::DEBOUNCE_MS;
 use crate::EventState;
 use crate::HYPRLAND_SUBSCRIPTION;
 use crate::UiEvent;
-use crate::get_hypr_socket_path;
+use std::env;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -171,4 +172,22 @@ async fn connect_to_hyprland_socket(
             }
         }
     }
+}
+
+pub fn get_hypr_socket_path() -> Option<PathBuf> {
+    let runtime_dir = env::var("XDG_RUNTIME_DIR").ok()?;
+    let instance = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
+
+    let base = PathBuf::from(runtime_dir).join("hypr").join(instance);
+
+    let candidates = [".socket2.sock", "hyprland.sock2"];
+
+    for name in candidates {
+        let path = base.join(name);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
 }

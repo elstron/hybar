@@ -9,6 +9,7 @@ use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 use crate::{
     EventState, UiEventState,
     models::clients::Client,
+    set_popover,
     user::models::{SectionsConfig, UserConfig},
     utils::{
         app_launch::app_lauch,
@@ -65,6 +66,14 @@ impl WidgetsBuilder {
             "workspaces" => self.widgets.workspaces.widget().clone().into(),
             "clock" => self.widgets.clock.clone(),
             "title" => self.widgets.title.widget().clone(),
+            "shutdown" => {
+                let button = gtk::Button::from_icon_name("system-shutdown");
+                let label = gtk::Label::new(Some("Shutdown"));
+
+                set_popover(&button, label.into());
+                button.add_css_class("shutdown-button");
+                button.into()
+            }
             "player" => {
                 let (player, status) = panels::player::build_ui();
                 let button = gtk::Button::with_label(&status.text());
@@ -77,10 +86,7 @@ impl WidgetsBuilder {
                 button.add_css_class("player-button");
                 button.set_child(Some(&status));
 
-                button.connect_clicked(move |_| match player.is_visible() {
-                    true => player.hide(),
-                    false => player.present(),
-                });
+                set_popover(&button, player);
                 button.into()
             }
             "apps" => {
@@ -105,10 +111,12 @@ impl WidgetsBuilder {
 
                 let settings = panels::settings::SettingsPanel::new(self.sender.clone());
                 let window = settings.render();
-                settings_button.connect_clicked(move |_| {
-                    println!("Opening settings window");
-                    window.present();
+
+                settings_button.connect_clicked(move |_| match window.is_visible() {
+                    true => window.hide(),
+                    false => window.present(),
                 });
+
                 settings_button.into()
             }
             _ => {

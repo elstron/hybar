@@ -1,6 +1,6 @@
 # Maintainer: stron <contact@stron.me>
 pkgname=hybar
-pkgver=0.0.11
+pkgver=0.0.12
 pkgrel=1
 pkgdesc="Hybar: A task-bar for Hyprland written in Rust"
 arch=("x86_64")

@@ -77,10 +77,11 @@ impl WidgetsBuilder {
             "player" => {
                 let (window, status) = panels::player::build_ui();
                 let button = gtk::Button::with_label("💤 No activity");
-
                 let button_clone = button.clone();
                 status.connect_notify_local(Some("label"), move |status, _| {
-                    button_clone.set_label(&status.text());
+                    let chars_limit = 15;
+                    let short_text = status.text().chars().take(chars_limit).collect::<String>();
+                    button_clone.set_label(format!("🎵 {}...", short_text).as_str());
                 });
 
                 button.add_css_class("player-button");

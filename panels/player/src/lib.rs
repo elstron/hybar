@@ -14,7 +14,7 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
     vbox.set_margin_end(5);
     vbox.set_halign(Align::Center);
 
-    let label = Label::new(Some(""));
+    let label = Label::new(Some("💤 No activity"));
     label.add_css_class("song-label");
     label.set_wrap(false);
     let status_label = Label::new(Some("Scanning for players..."));
@@ -76,7 +76,7 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
         glib::ControlFlow::Continue
     });
 
-    (window, status_label)
+    (window, label)
 }
 
 pub fn window(child: gtk::Box) -> ApplicationWindow {

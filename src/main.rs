@@ -145,6 +145,7 @@ async fn main() {
         section_container.append(section_left.as_ref());
         section_container.append(section_center.as_ref());
         section_container.append(section_right.as_ref());
+
         window.set_child(Some(&section_container));
 
         let motion_controller_for_normal_window =

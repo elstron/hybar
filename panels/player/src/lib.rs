@@ -1,12 +1,12 @@
 use gtk::glib;
 use gtk::prelude::*;
+use gtk::ApplicationWindow;
 use gtk::{Align, Box, Button, Label, Orientation};
+use gtk4_layer_shell::LayerShell;
 use mpris::{PlaybackStatus, PlayerFinder};
 use std::time::Duration;
 
-pub fn build_ui() -> (gtk::Widget, Label) {
-    let window = gtk::Box::new(Orientation::Vertical, 0);
-
+pub fn build_ui() -> (ApplicationWindow, Label) {
     let vbox = Box::new(Orientation::Vertical, 10);
     vbox.set_margin_top(20);
     vbox.set_margin_bottom(20);
@@ -42,7 +42,7 @@ pub fn build_ui() -> (gtk::Widget, Label) {
     vbox.append(&scrolled_window);
     vbox.append(&hbox_buttons);
 
-    window.append(&vbox);
+    let window = window(vbox);
 
     let btn_play_clone = btn_play.clone();
     btn_play.connect_clicked(move |_| {
@@ -76,7 +76,28 @@ pub fn build_ui() -> (gtk::Widget, Label) {
         glib::ControlFlow::Continue
     });
 
-    (window.into(), status_label)
+    (window, status_label)
+}
+
+pub fn window(child: gtk::Box) -> ApplicationWindow {
+    let window = ApplicationWindow::builder()
+        .title("Settings")
+        .default_width(400)
+        .build();
+    LayerShell::init_layer_shell(&window);
+
+    window.auto_exclusive_zone_enable();
+    window.set_layer(gtk4_layer_shell::Layer::Overlay);
+    window.set_anchor(gtk4_layer_shell::Edge::Right, true);
+    window.set_anchor(gtk4_layer_shell::Edge::Left, false);
+    window.set_anchor(gtk4_layer_shell::Edge::Top, true);
+    window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
+    window.set_namespace(Some("hybar:player"));
+
+    window.set_child(Some(&child));
+    window.add_css_class("settings-window");
+
+    window
 }
 
 fn control_media(command: &str) {

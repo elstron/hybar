@@ -75,8 +75,8 @@ impl WidgetsBuilder {
                 button.into()
             }
             "player" => {
-                let (player, status) = panels::player::build_ui();
-                let button = gtk::Button::with_label(&status.text());
+                let (window, status) = panels::player::build_ui();
+                let button = gtk::Button::with_label("💤 No activity");
 
                 let button_clone = button.clone();
                 status.connect_notify_local(Some("label"), move |status, _| {
@@ -84,9 +84,10 @@ impl WidgetsBuilder {
                 });
 
                 button.add_css_class("player-button");
-                button.set_child(Some(&status));
-
-                set_popover(&button, player);
+                button.connect_clicked(move |_| match window.is_visible() {
+                    true => window.hide(),
+                    false => window.present(),
+                });
                 button.into()
             }
             "apps" => {

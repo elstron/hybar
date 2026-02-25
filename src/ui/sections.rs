@@ -30,6 +30,11 @@ pub fn create_sections() -> BarSections {
     section_container.set_vexpand(false);
     section_container.set_hexpand(false);
     section_container.set_halign(gtk::Align::Fill);
+    section_container.set_valign(gtk::Align::Fill);
+    section_container.append(&section_left);
+    section_container.append(&section_center);
+    section_container.append(&section_right);
+
     BarSections {
         left: section_left,
         right: section_right,

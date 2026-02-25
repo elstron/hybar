@@ -9,19 +9,14 @@ use std::sync::Arc;
 pub struct SettingsPanel {
     window: ApplicationWindow,
     state: Arc<dyn HasSettingsEvent>,
-    settings: Settings,
-}
-
-#[derive(Clone)]
-pub struct Settings {
-    theme: String,
-    height: u32,
 }
 
 pub trait HasSettingsEvent: Send + Sync {
     fn pending_reload(&self);
     fn pending_theme_change(&self, theme: String);
     fn get_default_theme(&self) -> String;
+    fn enable_autohide(&self, enable: bool);
+    fn get_autohide(&self) -> bool;
 }
 
 impl SettingsPanel {
@@ -35,10 +30,6 @@ impl SettingsPanel {
         Self {
             window,
             state: state.clone(),
-            settings: Settings {
-                theme: state.get_default_theme(),
-                height: 30,
-            },
         }
     }
 
@@ -47,12 +38,11 @@ impl SettingsPanel {
 
         LayerShell::init_layer_shell(&settings_window);
 
-        settings_window.auto_exclusive_zone_enable();
         settings_window.set_layer(gtk4_layer_shell::Layer::Overlay);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Right, true);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Left, false);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
-        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
+        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
         settings_window.set_namespace(Some("hybar:settings"));
         let settings_panel = self.settings_panel();
 
@@ -65,16 +55,13 @@ impl SettingsPanel {
     fn settings_panel(&self) -> GtkBox {
         let vbox = GtkBox::new(Orientation::Vertical, 20);
 
-        let feature_toggle = CheckButton::with_label("Enable Feature X");
-        feature_toggle.set_active(true);
-        feature_toggle.add_css_class("feature-toggle");
+        let autohide_toggle = CheckButton::with_label("Enable Autohide");
+        autohide_toggle.set_active(self.state.get_autohide());
+        autohide_toggle.add_css_class("feature-toggle");
 
-        feature_toggle.connect_toggled(move |btn| match btn.is_active() {
-            true => println!("Feature X enabled"),
-            false => println!("Feature X disabled"),
-        });
-
-        vbox.append(&feature_toggle);
+        let state_clone = Arc::clone(&self.state);
+        autohide_toggle.connect_toggled(move |btn| state_clone.enable_autohide(btn.is_active()));
+        vbox.append(&autohide_toggle);
 
         let theme_selector = self.select_theme();
 
@@ -96,9 +83,9 @@ impl SettingsPanel {
         reload_button.connect_clicked(move |_| state_clone.pending_reload());
 
         vbox.append(&theme_selector);
-        vbox.append(&reload_button);
-        vbox.append(&cancel_button);
-        vbox.append(&save_button);
+        //vbox.append(&reload_button);
+        //vbox.append(&cancel_button);
+        //vbox.append(&save_button);
         vbox
     }
 

@@ -1,4 +1,6 @@
 use gtk::{Orientation, pango, prelude::*};
+
+#[derive(Debug, Clone)]
 pub struct TitleWidget {
     root: gtk::Widget,
     title_label: gtk::Label,

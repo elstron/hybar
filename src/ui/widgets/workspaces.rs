@@ -12,6 +12,7 @@ pub struct Workspace {
     pub lastwindow: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct WorkspacesWidget {
     root: GtkBox,
 }

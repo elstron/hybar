@@ -3,7 +3,7 @@ use glib::ControlFlow;
 use gtk::{Button, prelude::*};
 use std::{cell::Cell, rc::Rc};
 
-use crate::set_popover;
+use crate::hybar::set_popover;
 
 pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
     let clock_label = gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));

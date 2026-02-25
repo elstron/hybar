@@ -4,12 +4,13 @@ pub mod title;
 pub mod workspaces;
 
 use gtk::{Box as GtkBox, Image, gdk::Cursor, prelude::*};
+use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
+    hybar::set_popover,
     models::clients::Client,
-    set_popover,
     user::models::{SectionsConfig, UserConfig},
     utils::{
         app_launch::app_lauch,
@@ -17,6 +18,7 @@ use crate::{
     },
 };
 
+#[derive(Clone)]
 pub struct Widgets {
     pub workspaces: workspaces::WorkspacesWidget,
     pub clock: gtk::Widget,
@@ -24,6 +26,7 @@ pub struct Widgets {
     pub apps: gtk::Widget,
 }
 
+#[derive(Clone)]
 pub struct WidgetsBuilder {
     user_config: Rc<UserConfig>,
     event_state: Arc<EventState>,

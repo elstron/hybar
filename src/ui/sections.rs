@@ -13,16 +13,19 @@ pub fn create_sections() -> BarSections {
     section_left.set_halign(gtk::Align::Start);
     section_left.set_hexpand(true);
     section_left.add_css_class("section-left");
+    section_left.set_widget_name("section-left");
 
     let section_right = gtk::Box::new(Orientation::Horizontal, 0);
     section_right.set_halign(gtk::Align::End);
     section_right.set_hexpand(true);
     section_right.add_css_class("section-right");
+    section_right.set_widget_name("section-right");
 
     let section_center = gtk::Box::new(Orientation::Horizontal, 0);
     section_center.set_halign(gtk::Align::Center);
     section_center.set_hexpand(true);
     section_center.add_css_class("section-center");
+    section_center.set_widget_name("section-center");
 
     let section_container = gtk::Box::new(Orientation::Horizontal, 5);
     section_container.add_css_class("section-container");

@@ -88,10 +88,13 @@ impl Hybar {
     pub fn new(app: &Application) -> Arc<Self> {
         let (sender, receiver) = async_channel::unbounded::<UiEvent>();
         let preferences = Rc::new(RefCell::new(BarPreferences::default()));
+        let bar_window = BarWindows::new(app);
+        let hidden_window = bar_window.main.clone();
         Self {
-            window: BarWindows::new(app),
+            window: bar_window,
             preferences: Rc::clone(&preferences),
             widgets: Rc::new(Cell::new(WidgetsBuilder::new(
+                hidden_window,
                 Rc::new(load_config().unwrap_or_default()),
                 Arc::new(crate::EventState::new()),
                 Rc::new(Cell::new(true)),
@@ -141,6 +144,7 @@ impl Hybar {
             preferences: self.preferences.borrow().clone(),
         };
         let mut widgets_builder = WidgetsBuilder::new(
+            self.window.main.clone(),
             Rc::clone(&user_config),
             Arc::clone(&event_state),
             Rc::clone(&is_window_visible),
@@ -243,6 +247,7 @@ impl Hybar {
                         } else {
                             widgets_builder.create_widget_app(&window_name, &id, true);
                         }
+                        //widgets_builder.widgets.workspaces.generate_previews();
                     }
                     UiEvent::WindowClosed(id) => {
                         widgets_builder.update_active_clients();
@@ -276,6 +281,8 @@ impl Hybar {
                                 }
                             }
                         }
+
+                        //widgets_builder.widgets.workspaces.update_previews();
                     }
                 }
             }

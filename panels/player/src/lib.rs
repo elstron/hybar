@@ -2,6 +2,7 @@ use gtk::gdk::Texture;
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::ApplicationWindow;
+use gtk::EventControllerMotion;
 use gtk::{Align, Box, Button, Label, Orientation};
 use gtk4_layer_shell::LayerShell;
 use mpris::{PlaybackStatus, PlayerFinder};
@@ -80,7 +81,12 @@ pub fn window(child: gtk::Box) -> ApplicationWindow {
 
     window.set_child(Some(&child));
     window.add_css_class("settings-window");
-
+    let controller = EventControllerMotion::new();
+    let window_clone = window.clone();
+    controller.connect_leave(move |_| {
+        window_clone.hide();
+    });
+    window.add_controller(controller);
     window
 }
 

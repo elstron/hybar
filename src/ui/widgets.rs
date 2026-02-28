@@ -3,7 +3,7 @@ pub mod separator;
 pub mod title;
 pub mod workspaces;
 
-use gtk::{Box as GtkBox, Image, gdk::Cursor, prelude::*};
+use gtk::{Box as GtkBox, EventControllerMotion, Image, gdk::Cursor, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
@@ -28,6 +28,7 @@ pub struct Widgets {
 
 #[derive(Clone)]
 pub struct WidgetsBuilder {
+    main_window: gtk::ApplicationWindow,
     user_config: Rc<UserConfig>,
     event_state: Arc<EventState>,
     is_visible: Rc<Cell<bool>>,
@@ -39,12 +40,14 @@ pub struct WidgetsBuilder {
 
 impl WidgetsBuilder {
     pub fn new(
+        window: gtk::ApplicationWindow,
         user_config: Rc<UserConfig>,
         event_state: Arc<EventState>,
         is_visible: Rc<Cell<bool>>,
         sender: UiEventState,
     ) -> Self {
         Self {
+            main_window: window,
             user_config: user_config.clone(),
             event_state: Arc::clone(&event_state),
             is_visible: is_visible.clone(),
@@ -86,12 +89,18 @@ impl WidgetsBuilder {
                     let short_text = status.text().chars().take(chars_limit).collect::<String>();
                     button_clone.set_label(format!("🎵 {}...", short_text).as_str());
                 });
-
                 button.add_css_class("player-button");
+                let parent_name = match button.parent() {
+                    Some(parent) => parent.widget_name().to_string(),
+                    None => "".to_string(),
+                };
+                determine_window_position(parent_name.as_str(), &window);
+
                 button.connect_clicked(move |_| match window.is_visible() {
                     true => window.hide(),
                     false => window.present(),
                 });
+
                 button.into()
             }
             "apps" => {
@@ -326,5 +335,21 @@ impl WidgetsBuilder {
 
         image.set_pixel_size(size);
         image
+    }
+}
+pub fn determine_window_position(parent_name: &str, window: &gtk::ApplicationWindow) {
+    match parent_name {
+        "section-left" => {
+            window.set_anchor(gtk4_layer_shell::Edge::Left, true);
+            window.set_anchor(gtk4_layer_shell::Edge::Right, false);
+        }
+        "section-right" => {
+            window.set_anchor(gtk4_layer_shell::Edge::Left, false);
+            window.set_anchor(gtk4_layer_shell::Edge::Right, true);
+        }
+        _ => {
+            window.set_anchor(gtk4_layer_shell::Edge::Left, false);
+            window.set_anchor(gtk4_layer_shell::Edge::Right, false);
+        }
     }
 }

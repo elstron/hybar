@@ -5,7 +5,12 @@ use gtk::{Box as GtkBox, GestureClick, Label};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::process::Command;
+
 const ANY_BUTTON: u32 = 0;
+const URGENT_CLASS: &str = "workspace-urgent";
+const ACTIVE_CLASS: &str = "workspace-active";
+const DEFAULT_CLASS: &str = "workspace";
+const DEFAULT_ICON: &str = "\u{f111}";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Workspace {
@@ -127,7 +132,7 @@ pub fn update_workspaces(
     container: &GtkBox,
     urgent_id: Option<&String>,
     textures: Option<&HashMap<i32, Preview>>,
-    workspaces_cache: &mut HashMap<i32, Workspace>,
+    ws_cache: &mut HashMap<i32, Workspace>,
 ) {
     let active_ws = get_active_workspace();
     let mut workspaces = get_workspaces();
@@ -137,36 +142,36 @@ pub fn update_workspaces(
 
     let cursor = Cursor::from_name("pointer", None);
     for ws in workspaces {
-        let label = match child_exists(workspaces_cache, container, &ws.id)
+        let label = match child_exists(ws_cache, container, &ws.id)
             .and_then(|w| w.downcast::<Label>().ok())
         {
             Some(l) => l,
             None => {
-                workspaces_cache.insert(ws.id, ws.clone());
-                let new_label = Label::new(Some("\u{f111}"));
-                container.append(&new_label);
-                workspace_gesture(&new_label, ws.name.clone());
-                new_label.set_widget_name(&format!("workspace-{}", ws.id));
-                new_label.set_tooltip_text(Some(&format!("Workspace {}", ws.name)));
-                new_label.set_cursor(cursor.as_ref());
+                let label = Label::new(Some(DEFAULT_ICON));
 
-                new_label
+                ws_cache.insert(ws.id, ws.clone());
+                container.append(&label);
+                workspace_gesture(&label, ws.name.clone());
+
+                label.set_widget_name(&format!("workspace-{}", ws.id));
+                label.set_tooltip_text(Some(&format!("Workspace {}", ws.name)));
+                label.set_cursor(cursor.as_ref());
+                label
             }
         };
-        label.remove_css_class("workspace-active");
-        label.remove_css_class("workspace-urgent");
+        label.remove_css_class(URGENT_CLASS);
+        label.remove_css_class(ACTIVE_CLASS);
 
-        if let Some(active) = &active_ws {
-            if ws.id == active.id {
-                label.add_css_class("workspace-active");
-            } else if let Some(urgent) = urgent_id
-                && ws.lastwindow.contains(urgent)
-            {
-                label.add_css_class("workspace-urgent");
-            } else {
-                label.add_css_class("workspace");
-                label.set_text("\u{f111}");
-            }
+        if let Some(active) = &active_ws
+            && ws.id == active.id
+        {
+            label.add_css_class(ACTIVE_CLASS);
+        } else if let Some(urgent) = urgent_id
+            && ws.lastwindow.contains(urgent)
+        {
+            label.add_css_class(URGENT_CLASS);
+        } else {
+            label.add_css_class(DEFAULT_CLASS);
         }
 
         //let select_texture = textures.and_then(|t| t.get(&ws.id)).cloned();

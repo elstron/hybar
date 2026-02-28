@@ -162,17 +162,13 @@ pub fn update_workspaces(
         label.remove_css_class(URGENT_CLASS);
         label.remove_css_class(ACTIVE_CLASS);
 
-        if let Some(active) = &active_ws
-            && ws.id == active.id
-        {
-            label.add_css_class(ACTIVE_CLASS);
-        } else if let Some(urgent) = urgent_id
-            && ws.lastwindow.contains(urgent)
-        {
-            label.add_css_class(URGENT_CLASS);
-        } else {
-            label.add_css_class(DEFAULT_CLASS);
-        }
+        let class = match (active_ws.as_ref(), urgent_id) {
+            (Some(active), _) if ws.id == active.id => ACTIVE_CLASS,
+            (_, Some(urgent)) if ws.lastwindow.contains(urgent) => URGENT_CLASS,
+            _ => DEFAULT_CLASS,
+        };
+
+        label.add_css_class(class);
 
         //let select_texture = textures.and_then(|t| t.get(&ws.id)).cloned();
         //if let Some(texture) = select_texture {

@@ -2,6 +2,8 @@ pub mod clock;
 pub mod separator;
 pub mod title;
 pub mod workspaces;
+use futures::lock::Mutex;
+use mpris::{PlaybackStatus, PlayerFinder};
 
 use gtk::{Box as GtkBox, EventControllerMotion, Image, gdk::Cursor, prelude::*};
 use gtk4_layer_shell::LayerShell;

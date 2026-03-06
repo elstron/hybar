@@ -801,6 +801,7 @@ dependencies = [
  "gtk4-layer-shell",
  "hybar-core",
  "include_dir",
+ "mpris",
  "panels",
  "parking_lot",
  "serde",

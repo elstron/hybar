@@ -5,17 +5,14 @@ mod models;
 mod ui;
 mod user;
 mod utils;
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
 
 use gtk::{Application, prelude::*};
-use hybar::Hybar;
+use hybar::{BarPreferences, Hybar};
 
 use panels::settings::HasSettingsEvent;
 
-use hybar::BarPreferences;
+use crate::ui::widgets::WidgetsBuilder;
+
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 const DEBOUNCE_MS: u64 = 50;
@@ -90,6 +87,7 @@ impl HasSettingsEvent for UiEventState {
 #[tokio::main]
 async fn main() {
     let app = Application::builder().application_id("com.hybar").build();
+
     app.connect_activate(|app| {
         let hybar = Hybar::new(app);
         hybar.build()

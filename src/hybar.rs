@@ -247,7 +247,8 @@ impl Hybar {
                         } else {
                             widgets_builder.create_widget_app(&window_name, &id, true);
                         }
-                        //widgets_builder.widgets.workspaces.generate_previews();
+                        let _ = std::time::Duration::from_secs(3);
+                        widgets_builder.widgets.workspaces.update_previews();
                     }
                     UiEvent::WindowClosed(id) => {
                         widgets_builder.update_active_clients();
@@ -282,7 +283,7 @@ impl Hybar {
                             }
                         }
 
-                        //widgets_builder.widgets.workspaces.update_previews();
+                        widgets_builder.widgets.workspaces.update_previews();
                     }
                 }
             }

@@ -1,5 +1,4 @@
-use gtk::{Application, ApplicationWindow, prelude::*};
-use gtk4_layer_shell::LayerShell;
+use gtk::{Application, prelude::*};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -9,11 +8,11 @@ use std::{
 use crate::{
     PreferencesEvent, UiEvent, UiEventState,
     client::HyprlandClient,
-    config::{bootstrap::bootstrap_config, hidden_layer_configuration, layer_shell_configure},
+    config::bootstrap::bootstrap_config,
     ui::{
-        fullscreen::handle_fullscreen_visibility,
         sections::{BarSections, create_sections},
         widgets::WidgetsBuilder,
+        windows::BarWindows,
     },
     user::config::load_config,
     utils::css::load_css,
@@ -22,7 +21,7 @@ use crate::{
 pub struct Hybar {
     window: BarWindows,
     preferences: Rc<RefCell<BarPreferences>>,
-    widgets: Rc<Cell<WidgetsBuilder>>,
+    widgets: Rc<RefCell<WidgetsBuilder>>,
     channel: (
         async_channel::Sender<UiEvent>,
         async_channel::Receiver<UiEvent>,
@@ -33,44 +32,6 @@ pub struct Hybar {
 pub struct BarPreferences {
     pub autohide: bool,
     pub theme: String,
-}
-
-pub struct BarWindows {
-    pub is_visible: Rc<Cell<bool>>,
-    pub is_fullscreen: Rc<Cell<bool>>,
-    pub main: ApplicationWindow,
-    pub hidden: ApplicationWindow,
-}
-
-impl BarWindows {
-    pub fn new(app: &Application) -> Self {
-        let bar = Self {
-            main: ApplicationWindow::new(app),
-            hidden: ApplicationWindow::new(app),
-            is_visible: Rc::new(Cell::new(true)),
-            is_fullscreen: Rc::new(Cell::new(false)),
-        };
-
-        bar.main_window_settings();
-        bar.hidden_window_settings();
-        bar
-    }
-
-    fn main_window_settings(&self) {
-        self.main.set_title(Some("hybar"));
-        self.main.set_default_height(40);
-        LayerShell::init_layer_shell(&self.main);
-
-        layer_shell_configure(&self.main, "top");
-    }
-
-    fn hidden_window_settings(&self) {
-        self.hidden.set_title(Some("hidden hybar"));
-        self.hidden.set_default_height(2);
-        LayerShell::init_layer_shell(&self.hidden);
-
-        hidden_layer_configuration(&self.hidden, "top");
-    }
 }
 
 impl Default for BarPreferences {
@@ -93,14 +54,14 @@ impl Hybar {
         Self {
             window: bar_window,
             preferences: Rc::clone(&preferences),
-            widgets: Rc::new(Cell::new(WidgetsBuilder::new(
+            widgets: Rc::new(RefCell::new(WidgetsBuilder::new(
                 hidden_window,
                 Rc::new(load_config().unwrap_or_default()),
                 Arc::new(crate::EventState::new()),
                 Rc::new(Cell::new(true)),
                 UiEventState {
                     sender: sender.clone(),
-                    theme: "default".to_string(),
+                    theme: preferences.borrow().theme.clone(),
                     preferences: preferences.borrow().clone(),
                 },
             ))),
@@ -115,7 +76,6 @@ impl Hybar {
         }
 
         let user_config = load_config().unwrap_or_default();
-        let bar_height = 40;
         let user_config = Rc::new(user_config);
 
         load_css(&user_config.theme);
@@ -138,25 +98,13 @@ impl Hybar {
         let user_config = Rc::new(user_config);
         let event_state = Arc::new(crate::EventState::new());
 
-        let sender_event = UiEventState {
-            sender: self.channel.0.clone(),
-            theme: self.preferences.take().theme.clone(),
-            preferences: self.preferences.borrow().clone(),
-        };
-        let mut widgets_builder = WidgetsBuilder::new(
-            self.window.main.clone(),
-            Rc::clone(&user_config),
-            Arc::clone(&event_state),
-            Rc::clone(&is_window_visible),
-            sender_event,
-        );
-        let has_workspace_widget = widgets_builder.sync_widgets_layout(
+        let has_workspace_widget = self.widgets.borrow().sync_widgets_layout(
             Rc::clone(&section_left),
             Rc::clone(&section_right),
             Rc::clone(&section_center),
         );
 
-        if has_workspace_widget || widgets_builder.widget_exists("title") {
+        if has_workspace_widget || self.widgets.borrow().widget_exists("title") {
             let event_state_clone = Arc::clone(&event_state);
 
             let mut hypr_client = HyprlandClient::new(event_state_clone, self.channel.0.clone());
@@ -193,11 +141,7 @@ impl Hybar {
             is_window_visible.set(true);
         }
 
-        let window_clone = window.clone();
-        let hidden_window_clone = hidden_window.clone();
         let is_window_visible_clone = Rc::clone(&is_window_visible);
-
-        let is_fullscreen_clone = Rc::clone(&self.window.is_fullscreen);
         let user_config = Rc::clone(&user_config);
 
         let receiver = self.channel.1.clone();
@@ -206,19 +150,24 @@ impl Hybar {
             while let Ok(msg) = receiver.recv().await {
                 match msg {
                     UiEvent::PreferencesChanged(preference) => this.preferences_changed(preference),
-                    UiEvent::FullscreenChanged(is_fullscreen) => {
-                        handle_fullscreen_visibility(
-                            &window_clone,
-                            &hidden_window_clone,
-                            Rc::clone(&is_window_visible_clone),
-                            is_fullscreen,
-                        );
-                        is_fullscreen_clone.set(is_fullscreen);
-                    }
+                    UiEvent::FullscreenChanged(is_fullscreen) => this
+                        .window
+                        .handle_fullscreen(Rc::clone(&is_window_visible_clone), is_fullscreen),
                     UiEvent::TitleChanged(title) => {
-                        widgets_builder.widgets.title.set_title(title.as_str())
+                        let widgets_builder = this.widgets.borrow();
+                        widgets_builder.widgets.title.set_title(title.as_str());
+                        let client_name = title.split(",").next().unwrap_or("");
+                        let widget = find_child_by_name_or_id(
+                            &widgets_builder.widgets.apps,
+                            client_name,
+                            "",
+                        );
+                        if let Some(widget) = widget {
+                            widget.grab_focus();
+                        }
                     }
                     UiEvent::ReloadSettings => {
+                        let mut widgets_builder = this.widgets.borrow_mut();
                         let new_config = load_config().unwrap_or_default();
                         widgets_builder.update_config(Rc::new(new_config));
                         widgets_builder.sync_widgets_layout(
@@ -229,31 +178,35 @@ impl Hybar {
                     }
                     UiEvent::ThemeChanged(theme) => load_css(&theme),
                     UiEvent::WorkspaceChanged => {
-                        widgets_builder.widgets.workspaces.update(None);
+                        this.widgets.borrow_mut().widgets.workspaces.update(None);
                     }
-                    UiEvent::WorkspaceUrgent(urgent) => {
-                        widgets_builder.widgets.workspaces.update(Some(urgent))
-                    }
-                    UiEvent::WindowOpened((window_name, id)) => {
+                    UiEvent::WorkspaceUrgent(urgent) => this
+                        .widgets
+                        .borrow_mut()
+                        .widgets
+                        .workspaces
+                        .update(Some(urgent)),
+                    UiEvent::WindowOpened((name, id)) => {
+                        let mut widgets_builder = this.widgets.borrow_mut();
                         widgets_builder.update_active_clients();
-                        let widget = find_child_by_name_or_id(
-                            &widgets_builder.widgets.apps,
-                            &window_name,
-                            &id,
-                        );
+                        let parent = &widgets_builder.widgets.apps;
+                        let widget = find_child_by_name_or_id(parent, &name, &id);
 
-                        if let Some(widget) = widget {
-                            widget.add_css_class("opened");
-                        } else {
-                            widgets_builder.create_widget_app(&window_name, &id, true);
+                        match widget {
+                            Some(w) => w.add_css_class("opened"),
+                            None => widgets_builder.create_widget_app(&name, &id, true),
                         }
+
                         let _ = std::time::Duration::from_secs(3);
                         widgets_builder.widgets.workspaces.update_previews();
                     }
                     UiEvent::WindowClosed(id) => {
+                        let widgets_builder = this.widgets.borrow();
                         widgets_builder.update_active_clients();
-                        let widget =
-                            find_child_by_name_or_id(&widgets_builder.widgets.apps, "", &id);
+
+                        let apps = &widgets_builder.widgets.apps;
+
+                        let widget = find_child_by_name_or_id(apps, "", &id);
                         if let Some(widget) = widget {
                             let formatted_id = format!("_{}", id);
                             let widget_name =
@@ -272,6 +225,7 @@ impl Hybar {
                                     });
 
                                 if !is_favorite {
+                                    let widgets_builder = this.widgets.borrow();
                                     widgets_builder
                                         .widgets
                                         .apps
@@ -282,8 +236,6 @@ impl Hybar {
                                 }
                             }
                         }
-
-                        widgets_builder.widgets.workspaces.update_previews();
                     }
                 }
             }
@@ -297,14 +249,7 @@ impl Hybar {
             PreferencesEvent::Reload => {}
             PreferencesEvent::ThemeChanged(theme) => load_css(&theme),
             PreferencesEvent::AutohideChanged(autohide) => {
-                if autohide {
-                    self.window.hidden.set_focusable(true);
-                    self.window.main.hide();
-                } else {
-                    self.window.hidden.set_focusable(false);
-                    self.window.main.set_focusable(false);
-                    self.window.main.present();
-                }
+                self.window.toggle_autohide(autohide);
                 self.preferences.borrow_mut().autohide = autohide;
             }
         }

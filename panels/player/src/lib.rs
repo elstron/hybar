@@ -36,6 +36,8 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
     let btn_play_clone = btn_play.clone();
 
     btn_play.connect_clicked(move |_| {
+        control_media("play_pause");
+
         let btn = &btn_play_clone;
         let play_icon = "media-playback-start-symbolic";
         let pause_icon = "media-playback-pause-symbolic";
@@ -46,8 +48,6 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
             true => btn.set_icon_name(pause_icon),
             false => btn.set_icon_name(play_icon),
         };
-
-        control_media("play_pause");
     });
 
     btn_next.connect_clicked(move |_| {

@@ -11,8 +11,6 @@ use hybar::{BarPreferences, Hybar};
 
 use panels::settings::HasSettingsEvent;
 
-use crate::ui::widgets::WidgetsBuilder;
-
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
 const DEBOUNCE_MS: u64 = 50;

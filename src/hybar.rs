@@ -20,8 +20,8 @@ use crate::{
 
 pub struct Hybar {
     window: BarWindows,
-    preferences: Rc<RefCell<BarPreferences>>,
-    widgets: Rc<RefCell<WidgetsBuilder>>,
+    pub preferences: Rc<RefCell<BarPreferences>>,
+    pub widgets: Rc<RefCell<WidgetsBuilder>>,
     channel: (
         async_channel::Sender<UiEvent>,
         async_channel::Receiver<UiEvent>,
@@ -33,6 +33,7 @@ pub struct BarPreferences {
     pub autohide: bool,
     pub theme: String,
     pub bar_position: String,
+    pub favorites: Vec<String>,
 }
 
 impl Default for BarPreferences {
@@ -43,6 +44,9 @@ impl Default for BarPreferences {
             autohide: config.bar.autohide,
             theme: config.theme.clone(),
             bar_position: config.bar.position.clone(),
+            favorites: config.widgets.get("apps").map_or(Vec::new(), |app_config| {
+                app_config.favorites.clone().unwrap_or_default()
+            }),
         }
     }
 }
@@ -97,7 +101,6 @@ impl Hybar {
         let section_right = Rc::new(section_right);
 
         let is_window_visible = Rc::new(Cell::new(!user_config.bar.autohide));
-        let user_config = Rc::new(user_config);
         let event_state = Arc::new(crate::EventState::new());
 
         let has_workspace_widget = self.widgets.borrow().sync_widgets_layout(
@@ -144,7 +147,6 @@ impl Hybar {
         }
 
         let is_window_visible_clone = Rc::clone(&is_window_visible);
-        let user_config = Rc::clone(&user_config);
 
         let receiver = self.channel.1.clone();
         let this = Arc::clone(&self);
@@ -188,51 +190,8 @@ impl Hybar {
                         .widgets
                         .workspaces
                         .update(Some(urgent)),
-                    UiEvent::WindowOpened((name, id)) => {
-                        let mut widgets_builder = this.widgets.borrow_mut();
-                        widgets_builder.update_active_clients();
-                        let parent = &widgets_builder.widgets.apps;
-                        let widget = find_child_by_name_or_id(parent, &name, &id);
-
-                        match widget {
-                            Some(w) => w.add_css_class("opened"),
-                            None => widgets_builder.create_widget_app(&name, &id, true),
-                        }
-
-                        let _ = std::time::Duration::from_secs(3);
-                        widgets_builder.widgets.workspaces.update_previews();
-                    }
-                    UiEvent::WindowClosed(id) => {
-                        let widgets_builder = this.widgets.borrow();
-                        widgets_builder.update_active_clients();
-
-                        let apps = &widgets_builder.widgets.apps;
-
-                        let widget = find_child_by_name_or_id(apps, "", &id);
-                        if let Some(widget) = widget {
-                            let formatted_id = format!("_{}", id);
-                            let widget_name =
-                                &widget.widget_name().replace(formatted_id.as_str(), "");
-                            println!("Window closed event for widget: {}", widget_name);
-                            widget.set_widget_name(widget_name);
-
-                            if !widget_name.contains("_") {
-                                widget.remove_css_class("opened");
-
-                                let is_favorite =
-                                    user_config.widgets.get("apps").is_some_and(|app_config| {
-                                        app_config.favorites.clone().is_some_and(|favorites| {
-                                            favorites.contains(widget_name)
-                                        })
-                                    });
-
-                                if !is_favorite {
-                                    let widgets_builder = this.widgets.borrow();
-                                    widgets_builder.remove_widget_app(&widget);
-                                }
-                            }
-                        }
-                    }
+                    UiEvent::WindowOpened((name, id)) => this.window_opened(&id, &name),
+                    UiEvent::WindowClosed(id) => this.window_closed(&id),
                 }
             }
         });
@@ -249,7 +208,6 @@ impl Hybar {
                 self.preferences.borrow_mut().autohide = autohide;
             }
             PreferencesEvent::BarPositionChanged(position) => {
-                println!("Changing bar position to: {position}");
                 self.window.set_bar_position(&position);
                 self.preferences.borrow_mut().bar_position = position;
             }
@@ -327,7 +285,7 @@ pub fn set_popover(button: &gtk::Button, child: gtk::Widget) {
     });
 }
 
-fn find_child_by_name_or_id(box_: &gtk::Widget, name: &str, id: &str) -> Option<gtk::Widget> {
+pub fn find_child_by_name_or_id(box_: &gtk::Widget, name: &str, id: &str) -> Option<gtk::Widget> {
     let mut child = box_.first_child();
     while let Some(widget) = child {
         let name = if name.is_empty() { id } else { name };

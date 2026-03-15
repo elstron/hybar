@@ -1,6 +1,7 @@
 mod client;
 mod config;
 mod enums;
+mod events;
 mod hybar;
 mod impls;
 mod models;

@@ -32,6 +32,7 @@ pub struct Hybar {
 pub struct BarPreferences {
     pub autohide: bool,
     pub theme: String,
+    pub bar_position: String,
 }
 
 impl Default for BarPreferences {
@@ -40,7 +41,8 @@ impl Default for BarPreferences {
 
         Self {
             autohide: config.bar.autohide,
-            theme: "default".to_string(),
+            theme: config.theme.clone(),
+            bar_position: config.bar.position.clone(),
         }
     }
 }
@@ -226,13 +228,7 @@ impl Hybar {
 
                                 if !is_favorite {
                                     let widgets_builder = this.widgets.borrow();
-                                    widgets_builder
-                                        .widgets
-                                        .apps
-                                        .clone()
-                                        .downcast::<gtk::Box>()
-                                        .unwrap()
-                                        .remove(&widget);
+                                    widgets_builder.remove_widget_app(&widget);
                                 }
                             }
                         }
@@ -251,6 +247,11 @@ impl Hybar {
             PreferencesEvent::AutohideChanged(autohide) => {
                 self.window.toggle_autohide(autohide);
                 self.preferences.borrow_mut().autohide = autohide;
+            }
+            PreferencesEvent::BarPositionChanged(position) => {
+                println!("Changing bar position to: {position}");
+                self.window.set_bar_position(&position);
+                self.preferences.borrow_mut().bar_position = position;
             }
         }
     }

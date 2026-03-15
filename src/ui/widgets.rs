@@ -2,15 +2,15 @@ pub mod clock;
 pub mod separator;
 pub mod title;
 pub mod workspaces;
-use futures::lock::Mutex;
-use mpris::{PlaybackStatus, PlayerFinder};
 
-use gtk::{Box as GtkBox, EventControllerMotion, Image, gdk::Cursor, prelude::*};
+use gtk::{Box as GtkBox, Image, gdk::Cursor, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
+    config::BarPosition,
+    enums::widgets::BarWidget,
     hybar::set_popover,
     models::clients::Client,
     user::models::{SectionsConfig, UserConfig},
@@ -67,14 +67,13 @@ impl WidgetsBuilder {
         }
     }
 
-    pub fn build_widget(&self, name: &str) -> gtk::Widget {
-        let name = name.split('_').next().unwrap_or(name);
-        match name {
-            "separator" => separator::render(&self.user_config),
-            "workspaces" => self.widgets.workspaces.widget().clone().into(),
-            "clock" => self.widgets.clock.clone(),
-            "title" => self.widgets.title.widget().clone(),
-            "shutdown" => {
+    pub fn build_widget(&self, widget: BarWidget) -> gtk::Widget {
+        match widget {
+            BarWidget::Separator => separator::render(&self.user_config),
+            BarWidget::Workspaces => self.widgets.workspaces.widget().clone().into(),
+            BarWidget::Time => self.widgets.clock.clone(),
+            BarWidget::AppTitle => self.widgets.title.widget().clone(),
+            BarWidget::Shutdown => {
                 let button = gtk::Button::from_icon_name("system-shutdown");
                 let label = gtk::Label::new(Some("Shutdown"));
 
@@ -82,7 +81,7 @@ impl WidgetsBuilder {
                 button.add_css_class("shutdown-button");
                 button.into()
             }
-            "player" => {
+            BarWidget::Playback => {
                 let (window, status) = panels::player::build_ui();
                 let button = gtk::Button::with_label("💤 No activity");
                 let button_clone = button.clone();
@@ -105,7 +104,7 @@ impl WidgetsBuilder {
 
                 button.into()
             }
-            "apps" => {
+            BarWidget::Apps => {
                 let container = &self.widgets.apps;
                 container.add_css_class("apps-container");
 
@@ -121,7 +120,7 @@ impl WidgetsBuilder {
                 }
                 container.clone()
             }
-            "settings" => {
+            BarWidget::Settings => {
                 let settings_button = gtk::Button::with_label("");
                 settings_button.add_css_class("settings-button");
 
@@ -135,8 +134,8 @@ impl WidgetsBuilder {
 
                 settings_button.into()
             }
-            _ => {
-                let button = self.user_config.custom_apps.get(name);
+            BarWidget::Custom(name) => {
+                let button = self.user_config.custom_apps.get(name.as_str());
                 if let Some(button) = button {
                     let btn = match button.icon.as_deref() {
                         Some(icon_name) => gtk::Button::with_label(icon_name),
@@ -198,12 +197,18 @@ impl WidgetsBuilder {
             if item == "workspaces" {
                 has_workspace = true;
             }
+            let bar_widget = item
+                .split('_')
+                .next()
+                .unwrap_or(item)
+                .parse::<BarWidget>()
+                .unwrap_or(BarWidget::Custom(item.to_string()));
 
             let widget = self
                 .widgets_cache
                 .borrow_mut()
                 .entry(item.to_string())
-                .or_insert_with(|| self.build_widget(item))
+                .or_insert_with(|| self.build_widget(bar_widget))
                 .clone();
             if let Some(parent) = widget.parent()
                 && parent != **container
@@ -319,8 +324,16 @@ impl WidgetsBuilder {
         *self.active_clients.borrow_mut() = clients::active_clients().unwrap_or_default();
     }
 
+    pub fn remove_widget_app(&self, widget: &gtk::Widget) {
+        self.widgets
+            .apps
+            .clone()
+            .downcast::<gtk::Box>()
+            .unwrap()
+            .remove(widget);
+    }
+
     pub fn load_icon(&self, icon_name: &str, size: i32) -> Image {
-        println!("Loading icon: {}", icon_name);
         let image = if icon_name.contains('/')
             || icon_name.ends_with(".png")
             || icon_name.ends_with(".svg")

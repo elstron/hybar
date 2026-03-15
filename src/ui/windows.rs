@@ -2,7 +2,7 @@ use gtk::{Application, ApplicationWindow, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, rc::Rc};
 
-use crate::config::{hidden_layer_configuration, layer_shell_configure};
+use crate::config::{BarPosition, hidden_layer_configuration, layer_shell_configure, set_position};
 
 pub struct BarWindows {
     pub is_visible: Rc<Cell<bool>>,
@@ -57,12 +57,22 @@ impl BarWindows {
 
     pub fn toggle_autohide(&self, enable: bool) {
         if enable {
-            self.main.hide();
             self.hidden.set_focusable(true);
         } else {
             self.hidden.set_focusable(false);
             self.main.set_focusable(false);
             self.main.present();
         }
+    }
+
+    pub fn set_bar_position(&self, position: &str) {
+        set_position(
+            &self.main,
+            position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
+        );
+        set_position(
+            &self.hidden,
+            position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
+        );
     }
 }

@@ -1,3 +1,4 @@
+pub mod traits;
 use directories::ProjectDirs;
 use gtk::prelude::*;
 use gtk::{ApplicationWindow, Box as GtkBox, CheckButton, ComboBoxText, Orientation};
@@ -5,18 +6,12 @@ use gtk4_layer_shell::LayerShell;
 use std::fs;
 use std::sync::Arc;
 
+use traits::HasSettingsEvent;
+
 #[derive(Clone)]
 pub struct SettingsPanel {
     window: ApplicationWindow,
     state: Arc<dyn HasSettingsEvent>,
-}
-
-pub trait HasSettingsEvent: Send + Sync {
-    fn pending_reload(&self);
-    fn pending_theme_change(&self, theme: String);
-    fn get_default_theme(&self) -> String;
-    fn enable_autohide(&self, enable: bool);
-    fn get_autohide(&self) -> bool;
 }
 
 impl SettingsPanel {
@@ -48,7 +43,6 @@ impl SettingsPanel {
 
         settings_window.set_child(Some(&settings_panel));
         settings_window.add_css_class("settings-window");
-
         settings_window
     }
 
@@ -64,6 +58,7 @@ impl SettingsPanel {
         vbox.append(&autohide_toggle);
 
         let theme_selector = self.select_theme();
+        let _bar_position_selector = self.bar_position_selector();
 
         let reload_button = gtk::Button::with_label("Reload Settings");
         reload_button.add_css_class("info");
@@ -83,6 +78,7 @@ impl SettingsPanel {
         reload_button.connect_clicked(move |_| state_clone.pending_reload());
 
         vbox.append(&theme_selector);
+        vbox.append(&_bar_position_selector);
         //vbox.append(&reload_button);
         //vbox.append(&cancel_button);
         //vbox.append(&save_button);
@@ -140,7 +136,40 @@ impl SettingsPanel {
         hbox
     }
 
-    fn save_settings(&self) {
-        println!("Saving settings...");
+    fn bar_position_selector(&self) -> GtkBox {
+        let hbox = GtkBox::new(Orientation::Horizontal, 5);
+        let label = gtk::Label::new(Some("Bar Position:"));
+        let option_dropdown = ComboBoxText::new();
+        option_dropdown.append_text("Top");
+        option_dropdown.append_text("Bottom");
+        option_dropdown.append_text("Left");
+        option_dropdown.append_text("Right");
+        option_dropdown.add_css_class("option-dropdown");
+        let current_position = self.state.get_bar_position();
+
+        option_dropdown.set_active(match current_position.as_str() {
+            "top" => Some(0),
+            "bottom" => Some(1),
+            "left" => Some(2),
+            "right" => Some(3),
+            _ => None,
+        });
+
+        option_dropdown.connect_changed({
+            let state_clone = Arc::clone(&self.state);
+            move |combo| {
+                if let Some(position) = combo.active_text() {
+                    state_clone.set_bar_position(position.to_string());
+                }
+            }
+        });
+
+        hbox.append(&label);
+        hbox.append(&option_dropdown);
+        hbox.add_css_class("section");
+        hbox
     }
+    //fn save_settings(&self) {
+    //    println!("Saving settings...");
+    //}
 }

@@ -1,6 +1,8 @@
 mod client;
 mod config;
+mod enums;
 mod hybar;
+mod impls;
 mod models;
 mod ui;
 mod user;
@@ -8,8 +10,6 @@ mod utils;
 
 use gtk::{Application, prelude::*};
 use hybar::{BarPreferences, Hybar};
-
-use panels::settings::HasSettingsEvent;
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;
@@ -31,6 +31,7 @@ pub enum PreferencesEvent {
     Reload,
     ThemeChanged(String),
     AutohideChanged(bool),
+    BarPositionChanged(String),
 }
 
 pub struct EventState {
@@ -49,36 +50,6 @@ impl EventState {
         Self {
             pending_title: parking_lot::Mutex::new(None),
         }
-    }
-}
-
-impl HasSettingsEvent for UiEventState {
-    fn pending_reload(&self) {
-        self.sender
-            .try_send(UiEvent::ReloadSettings)
-            .unwrap_or_else(|e| eprintln!("Failed to send reload settings event: {}", e));
-    }
-
-    fn pending_theme_change(&self, theme: String) {
-        self.sender
-            .try_send(UiEvent::ThemeChanged(theme))
-            .unwrap_or_else(|e| eprintln!("Failed to send theme change event: {}", e));
-    }
-
-    fn get_default_theme(&self) -> String {
-        self.theme.clone()
-    }
-
-    fn enable_autohide(&self, _enable: bool) {
-        self.sender
-            .try_send(UiEvent::PreferencesChanged(
-                PreferencesEvent::AutohideChanged(_enable),
-            ))
-            .unwrap_or_else(|e| eprintln!("Failed to send fullscreen change event: {}", e));
-    }
-
-    fn get_autohide(&self) -> bool {
-        self.preferences.autohide
     }
 }
 

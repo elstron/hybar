@@ -3,7 +3,7 @@ use glib::ControlFlow;
 use gtk::{Button, prelude::*};
 use std::{cell::Cell, rc::Rc};
 
-use crate::hybar::set_popover;
+use crate::bar::set_popover;
 
 pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
     let fomat = "%I:%M %P\n%d/%m/%Y";

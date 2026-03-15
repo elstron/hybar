@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+#[allow(dead_code)]
 pub type Clients = Vec<Client>;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

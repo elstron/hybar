@@ -1,8 +1,11 @@
 use crate::utils::desktop_dirs;
 use std::fs;
+
 #[derive(Debug)]
 pub struct DesktopFile {
+    #[allow(dead_code)]
     pub name: String,
+
     pub exec: String,
     pub icon: Option<String>,
 }

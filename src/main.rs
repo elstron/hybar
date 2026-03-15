@@ -1,16 +1,15 @@
+mod bar;
 mod client;
 mod config;
 mod enums;
-mod events;
-mod hybar;
 mod impls;
 mod models;
 mod ui;
 mod user;
 mod utils;
 
+use bar::{BarPreferences, Hybar};
 use gtk::{Application, prelude::*};
-use hybar::{BarPreferences, Hybar};
 
 pub const BACKGROUND_COLOR: &str = "#1a202c";
 const HYPRLAND_SUBSCRIPTION: &str = r#"["subscribe", ["workspace", "fullscreen"]]"#;

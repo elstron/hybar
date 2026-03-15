@@ -1,7 +1,7 @@
 use gtk::gdk::{Cursor, Texture};
 use gtk::gdk_pixbuf::Pixbuf;
+use gtk::prelude::*;
 use gtk::{ApplicationWindow, Box as GtkBox, EventControllerMotion, GestureClick, Label};
-use gtk::{EventController, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -25,6 +25,7 @@ pub struct Workspace {
 #[derive(Debug, Clone)]
 pub struct WorkspacesWidget {
     root: GtkBox,
+    #[allow(dead_code)]
     previews: HashMap<i32, Preview>,
     preview_window: Rc<RefCell<PreviewWindow>>,
     workspaces_cache: HashMap<i32, Workspace>,

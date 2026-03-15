@@ -1,4 +1,4 @@
-use crate::hybar::{Hybar, find_child_by_name_or_id};
+use crate::bar::{Hybar, find_child_by_name_or_id};
 use gtk::prelude::*;
 
 impl Hybar {
@@ -28,7 +28,6 @@ impl Hybar {
             if let Some(widget) = widget {
                 let formatted_id = format!("_{}", id);
                 let widget_name = &widget.widget_name().replace(formatted_id.as_str(), "");
-                println!("Window closed event for widget: {}", widget_name);
                 widget.set_widget_name(widget_name);
 
                 if !widget_name.contains("_") {

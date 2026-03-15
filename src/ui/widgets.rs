@@ -9,8 +9,8 @@ use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
+    bar::set_popover,
     enums::widgets::BarWidget,
-    hybar::set_popover,
     models::clients::Client,
     user::models::{SectionsConfig, UserConfig},
     utils::{

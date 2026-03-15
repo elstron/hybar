@@ -1,3 +1,4 @@
+mod events;
 use gtk::{Application, prelude::*};
 use std::{
     cell::{Cell, RefCell},
@@ -6,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    PreferencesEvent, UiEvent, UiEventState,
+    UiEvent, UiEventState,
     client::HyprlandClient,
     config::bootstrap::bootstrap_config,
     ui::{
@@ -20,8 +21,8 @@ use crate::{
 
 pub struct Hybar {
     window: BarWindows,
-    pub preferences: Rc<RefCell<BarPreferences>>,
-    pub widgets: Rc<RefCell<WidgetsBuilder>>,
+    preferences: Rc<RefCell<BarPreferences>>,
+    widgets: Rc<RefCell<WidgetsBuilder>>,
     channel: (
         async_channel::Sender<UiEvent>,
         async_channel::Receiver<UiEvent>,
@@ -157,29 +158,12 @@ impl Hybar {
                     UiEvent::FullscreenChanged(is_fullscreen) => this
                         .window
                         .handle_fullscreen(Rc::clone(&is_window_visible_clone), is_fullscreen),
-                    UiEvent::TitleChanged(title) => {
-                        let widgets_builder = this.widgets.borrow();
-                        widgets_builder.widgets.title.set_title(title.as_str());
-                        let client_name = title.split(",").next().unwrap_or("");
-                        let widget = find_child_by_name_or_id(
-                            &widgets_builder.widgets.apps,
-                            client_name,
-                            "",
-                        );
-                        if let Some(widget) = widget {
-                            widget.grab_focus();
-                        }
-                    }
-                    UiEvent::ReloadSettings => {
-                        let mut widgets_builder = this.widgets.borrow_mut();
-                        let new_config = load_config().unwrap_or_default();
-                        widgets_builder.update_config(Rc::new(new_config));
-                        widgets_builder.sync_widgets_layout(
-                            Rc::clone(&section_left),
-                            Rc::clone(&section_right),
-                            Rc::clone(&section_center),
-                        );
-                    }
+                    UiEvent::TitleChanged(title) => this.title_changed(&title),
+                    UiEvent::ReloadSettings => this.reload_bar(
+                        Rc::clone(&section_left),
+                        Rc::clone(&section_right),
+                        Rc::clone(&section_center),
+                    ),
                     UiEvent::ThemeChanged(theme) => load_css(&theme),
                     UiEvent::WorkspaceChanged => {
                         this.widgets.borrow_mut().widgets.workspaces.update(None);
@@ -197,21 +181,6 @@ impl Hybar {
         });
         hidden_window.present();
         window.present();
-    }
-
-    fn preferences_changed(&self, preference: PreferencesEvent) {
-        match preference {
-            PreferencesEvent::Reload => {}
-            PreferencesEvent::ThemeChanged(theme) => load_css(&theme),
-            PreferencesEvent::AutohideChanged(autohide) => {
-                self.window.toggle_autohide(autohide);
-                self.preferences.borrow_mut().autohide = autohide;
-            }
-            PreferencesEvent::BarPositionChanged(position) => {
-                self.window.set_bar_position(&position);
-                self.preferences.borrow_mut().bar_position = position;
-            }
-        }
     }
 
     pub fn layer_motion_controller(&self) -> gtk::EventControllerMotion {

@@ -9,7 +9,6 @@ use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
-    config::BarPosition,
     enums::widgets::BarWidget,
     hybar::set_popover,
     models::clients::Client,
@@ -28,6 +27,7 @@ pub struct Widgets {
     pub apps: gtk::Widget,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct WidgetsBuilder {
     main_window: gtk::ApplicationWindow,

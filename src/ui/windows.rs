@@ -2,7 +2,10 @@ use gtk::{Application, ApplicationWindow, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, rc::Rc};
 
-use crate::config::{BarPosition, hidden_layer_configuration, layer_shell_configure, set_position};
+use crate::{
+    config::{hidden_layer_configuration, layer_shell_configure, set_position},
+    enums::preferences::BarPosition,
+};
 
 pub struct BarWindows {
     pub is_visible: Rc<Cell<bool>>,
@@ -74,5 +77,10 @@ impl BarWindows {
             &self.hidden,
             position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
         );
+    }
+
+    #[allow(dead_code)]
+    pub fn set_bar_layout(&self) {
+        todo!("Implement set_bar_layout function in BarWindows struct");
     }
 }

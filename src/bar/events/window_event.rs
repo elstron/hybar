@@ -1,49 +1,57 @@
-use crate::bar::{Hybar, find_child_by_name_or_id};
+use crate::bar::{Hybar, find_widget_child};
 use gtk::prelude::*;
 
 impl Hybar {
-    pub fn window_opened(&self, id: &str, name: &str) {
+    pub fn window_opened(&self, _id: &str, name: &str) {
         let mut widgets_builder = self.widgets.borrow_mut();
         widgets_builder.update_active_clients();
         let parent = &widgets_builder.widgets.apps;
-        let widget = find_child_by_name_or_id(parent, name, id);
+        let widget = find_widget_child(parent, name);
 
         match widget {
             Some(w) => w.add_css_class("opened"),
-            None => widgets_builder.create_widget_app(name, id, true),
+            None => widgets_builder.create_widget_app(name, true),
         }
-
-        let _ = std::time::Duration::from_secs(3);
         widgets_builder.widgets.workspaces.update_previews();
     }
 
     pub fn window_closed(&self, id: &str) {
         {
+            let address = format!("0x{}", id);
             let widgets_builder = self.widgets.borrow();
-            widgets_builder.update_active_clients();
 
+            let clients = &widgets_builder.get_active_clients();
+            let find_client = clients.iter().find(|client| client.address == address);
+
+            widgets_builder.update_active_clients();
+            let client = match find_client {
+                Some(client) => {
+                    let filtered_clients: Vec<_> =
+                        clients.iter().filter(|c| c.class == client.class).collect();
+                    if filtered_clients.len() > 1 {
+                        return;
+                    };
+                    client
+                }
+                None => return,
+            };
             let apps = &widgets_builder.widgets.apps;
 
-            let widget = find_child_by_name_or_id(apps, "", id);
+            let widget = find_widget_child(apps, &client.class.to_lowercase());
             if let Some(widget) = widget {
-                let formatted_id = format!("_{}", id);
-                let widget_name = &widget.widget_name().replace(formatted_id.as_str(), "");
-                widget.set_widget_name(widget_name);
+                widget.remove_css_class("opened");
+                apps.grab_focus();
 
-                if !widget_name.contains("_") {
-                    widget.remove_css_class("opened");
+                let is_favorite = self
+                    .preferences
+                    .borrow()
+                    .favorites
+                    .iter()
+                    .any(|fav| fav == &client.class);
 
-                    let is_favorite = self
-                        .preferences
-                        .borrow()
-                        .favorites
-                        .iter()
-                        .any(|fav| fav == widget_name);
-
-                    if !is_favorite {
-                        let widgets_builder = self.widgets.borrow();
-                        widgets_builder.remove_widget_app(&widget);
-                    }
+                if !is_favorite {
+                    let widgets_builder = self.widgets.borrow();
+                    widgets_builder.remove_widget_app(&widget);
                 }
             }
         }

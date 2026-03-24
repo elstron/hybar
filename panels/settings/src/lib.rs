@@ -37,7 +37,7 @@ impl SettingsPanel {
         settings_window.set_anchor(gtk4_layer_shell::Edge::Right, true);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Left, false);
         settings_window.set_anchor(gtk4_layer_shell::Edge::Top, true);
-        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, false);
+        settings_window.set_anchor(gtk4_layer_shell::Edge::Bottom, true);
         settings_window.set_namespace(Some("hybar:settings"));
         let settings_panel = self.settings_panel();
 

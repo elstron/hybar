@@ -57,6 +57,7 @@ impl Hybar {
         let (sender, receiver) = async_channel::unbounded::<UiEvent>();
         let preferences = Rc::new(RefCell::new(BarPreferences::default()));
         let bar_window = BarWindows::new(app);
+        bar_window.set_bar_position(&preferences.borrow().bar_position);
         let hidden_window = bar_window.main.clone();
         Self {
             window: bar_window,
@@ -254,20 +255,14 @@ pub fn set_popover(button: &gtk::Button, child: gtk::Widget) {
     });
 }
 
-pub fn find_child_by_name_or_id(box_: &gtk::Widget, name: &str, id: &str) -> Option<gtk::Widget> {
+pub fn find_widget_child(box_: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
     let mut child = box_.first_child();
     while let Some(widget) = child {
-        let name = if name.is_empty() { id } else { name };
-        let has_name = widget.widget_name().contains(name);
-        let has_id = widget.widget_name().contains(id);
+        let has_name = widget.widget_name() == name;
 
         if !has_name {
             child = widget.next_sibling();
             continue;
-        }
-
-        if !has_id {
-            widget.set_widget_name(&format!("{}_{}", widget.widget_name(), id));
         }
 
         return Some(widget);

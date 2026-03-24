@@ -122,7 +122,7 @@ impl HyprlandClient {
                     title = "".to_string();
                 }
 
-                self.states.latest_title = Some(title);
+                self.states.latest_title = Some(title.to_lowercase());
             }
             "urgent" => {
                 let urgent_id = event_value.trim().to_string();

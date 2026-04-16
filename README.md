@@ -2,6 +2,8 @@
 
 **HyBar** is a **custom status bar for Wayland/Hyprland** written in Rust. It is a graphical interface project that provides a top bar with widgets and system information. It is an alternative inspired by Waybar but designed for the Hyprland compositor.
 
+<img width="1920" height="1044" alt="screenshot_1776308183" src="https://github.com/user-attachments/assets/dcb70a59-9767-4d87-aa72-d534a3f95118" />
+
 ### **Features:**
 
 - Monitoring of active and urgent workspaces and changes

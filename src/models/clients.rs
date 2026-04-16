@@ -15,7 +15,6 @@ pub struct Client {
     pub size: Vec<i64>,
     pub workspace: Workspace,
     pub floating: bool,
-    pub pseudo: bool,
     pub monitor: i64,
     pub class: String,
     pub title: String,

@@ -198,7 +198,7 @@ fn update_status(
     title_l: &Label,
     status_l: &Label,
     artists_l: &Label,
-    progress_l: gtk::ProgressBar,
+    _progress_l: gtk::ProgressBar,
     cover_art: &gtk::Picture,
 ) {
     let finder = match PlayerFinder::new() {

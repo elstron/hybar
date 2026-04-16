@@ -21,6 +21,8 @@ dirs-next = "2"
 async-channel = "2.5.0"
 include_dir = "0.7.4"
 directories = "6.0.0"
-
+mpris = "2.0"
+shell-words = "1.1"
+libc = "0.2"
 [workspace]
 members = ["hybar-core", "panels"]

@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+#[allow(dead_code)]
 pub type Clients = Vec<Client>;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -14,7 +15,6 @@ pub struct Client {
     pub size: Vec<i64>,
     pub workspace: Workspace,
     pub floating: bool,
-    pub pseudo: bool,
     pub monitor: i64,
     pub class: String,
     pub title: String,

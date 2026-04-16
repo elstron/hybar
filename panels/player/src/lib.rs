@@ -12,24 +12,32 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
     let main_box = main_box();
     let activity_container = activity_container();
     let label = activity_label();
+    let artist_label = artist_label();
     let status_label = status_label();
     let cover_art = cover_art_image(100);
-
+    let progress_bar = gtk::ProgressBar::new();
+    progress_bar.add_css_class("progress-bar");
+    progress_bar.set_hexpand(true);
+    progress_bar.set_vexpand(false);
+    progress_bar.set_size_request(0, 5);
     let scrolled_window = title_label_container(&label);
 
     let (hbox_buttons, btn_play, btn_next, btn_prev) = actions_box();
 
     main_box.append(&cover_art);
     main_box.append(&activity_container);
-    activity_container.append(&status_label);
+    activity_container.append(&artist_label);
     activity_container.append(&scrolled_window);
     activity_container.append(&hbox_buttons);
+    activity_container.append(&progress_bar);
 
     let window = window(main_box);
 
     let btn_play_clone = btn_play.clone();
 
     btn_play.connect_clicked(move |_| {
+        control_media("play_pause");
+
         let btn = &btn_play_clone;
         let play_icon = "media-playback-start-symbolic";
         let pause_icon = "media-playback-pause-symbolic";
@@ -40,8 +48,6 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
             true => btn.set_icon_name(pause_icon),
             false => btn.set_icon_name(play_icon),
         };
-
-        control_media("play_pause");
     });
 
     btn_next.connect_clicked(move |_| {
@@ -55,9 +61,16 @@ pub fn build_ui() -> (ApplicationWindow, Label) {
     let label_clone = label.clone();
     let status_clone = status_label.clone();
     let cover_art_clone = cover_art.clone();
-
+    let artist_label_clone = artist_label.clone();
+    let progress_clone = progress_bar.clone();
     glib::timeout_add_local(Duration::from_millis(500), move || {
-        update_status(&label_clone, &status_clone, &cover_art_clone);
+        update_status(
+            &label_clone,
+            &status_clone,
+            &artist_label_clone,
+            progress_clone.clone(),
+            &cover_art_clone,
+        );
         glib::ControlFlow::Continue
     });
 
@@ -93,6 +106,13 @@ pub fn window(child: gtk::Box) -> ApplicationWindow {
 fn activity_label() -> Label {
     let label = Label::new(Some("💤 No activity"));
     label.add_css_class("song-label");
+    label.set_wrap(false);
+    label
+}
+
+fn artist_label() -> Label {
+    let label = Label::new(Some("Artist"));
+    label.add_css_class("artist-label");
     label.set_wrap(false);
     label
 }
@@ -174,22 +194,31 @@ fn control_media(command: &str) {
     }
 }
 
-fn update_status(label: &Label, status: &Label, cover_art: &gtk::Picture) {
+fn update_status(
+    title_l: &Label,
+    status_l: &Label,
+    artists_l: &Label,
+    _progress_l: gtk::ProgressBar,
+    cover_art: &gtk::Picture,
+) {
     let finder = match PlayerFinder::new() {
         Ok(f) => f,
         Err(_) => {
-            label.set_text("Error D-Bus");
             return;
         }
     };
 
     if let Ok(player) = finder.find_active() {
         let metadata = player.get_metadata().ok();
-        let title = metadata
-            .as_ref()
-            .and_then(|m| m.title())
-            .unwrap_or("Unknown");
+        //let position = player.get_position().ok();
+        //let duration = metadata.as_ref().and_then(|m| m.length());
 
+        //let progress = match (position, duration) {
+        //   (Some(pos), Some(dur)) => pos.as_secs_f64() / dur.as_secs_f64(),
+        //   _ => 0.0,
+        //};
+
+        //progress_l.set_fraction(progress);
         let status_icon = match player
             .get_playback_status()
             .unwrap_or(PlaybackStatus::Stopped)
@@ -199,27 +228,37 @@ fn update_status(label: &Label, status: &Label, cover_art: &gtk::Picture) {
             PlaybackStatus::Stopped => "⏹ Stopped",
         };
 
-        if label.text().contains(title) && status.text() == status_icon {
-            return;
-        }
+        let (title, artists, _duration) = match metadata {
+            Some(ref m) => {
+                let title = m.title().unwrap_or("Unknown");
 
-        let artists = metadata
-            .as_ref()
-            .and_then(|m| m.artists())
-            .map(|a| a.join(", "))
-            .unwrap_or_default();
+                if title_l.text() == title && status_l.text() == status_icon {
+                    return;
+                }
+
+                let artists = m
+                    .artists()
+                    .map(|a| a.join(", "))
+                    .unwrap_or_else(|| "Unknown Artist".to_string());
+
+                let duration = m.length().map(|d| d.as_secs_f64()).unwrap_or(0.0);
+
+                (title, artists, duration)
+            }
+            None => ("Unknown", "Unknown Artist".to_string(), 0.0),
+        };
 
         let c_art = metadata.as_ref().and_then(|m| m.art_url());
 
-        let text = format!("{} - {}", title, artists);
-        label.set_text(&text);
-        status.set_text(status_icon);
+        title_l.set_text(title);
+        status_l.set_text(status_icon);
+        artists_l.set_text(&artists);
 
         let file = gtk::gio::File::for_uri(c_art.unwrap_or_default());
         let texture = Texture::from_file(&file).ok();
 
         cover_art.set_paintable(texture.as_ref());
     } else {
-        label.set_text("💤 No activity");
+        title_l.set_text("💤 No activity");
     }
 }

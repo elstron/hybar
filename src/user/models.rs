@@ -1,7 +1,7 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 
-use serde::Deserialize;
-
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct UserConfig {
     pub theme: String,
@@ -12,12 +12,14 @@ pub struct UserConfig {
     pub custom_apps: HashMap<String, CustomAppsConfig>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct UiConfig {
     pub background: String,
     pub accent: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct BarConfig {
     pub height: u32,
@@ -32,6 +34,7 @@ pub struct SectionsConfig {
     pub right: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct WidgetsConfig {
     pub favorites: Option<Vec<String>>,

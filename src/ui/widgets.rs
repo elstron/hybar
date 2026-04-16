@@ -3,13 +3,14 @@ pub mod separator;
 pub mod title;
 pub mod workspaces;
 
-use gtk::{Box as GtkBox, EventControllerMotion, Image, gdk::Cursor, prelude::*};
+use gtk::{Box as GtkBox, GestureClick, Image, gdk::Cursor, prelude::*};
 use gtk4_layer_shell::LayerShell;
 use std::{cell::Cell, collections::HashSet, path::Path, rc::Rc, sync::Arc};
 
 use crate::{
     EventState, UiEventState,
-    hybar::set_popover,
+    bar::set_popover,
+    enums::widgets::BarWidget,
     models::clients::Client,
     user::models::{SectionsConfig, UserConfig},
     utils::{
@@ -26,6 +27,7 @@ pub struct Widgets {
     pub apps: gtk::Widget,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct WidgetsBuilder {
     main_window: gtk::ApplicationWindow,
@@ -65,14 +67,13 @@ impl WidgetsBuilder {
         }
     }
 
-    pub fn build_widget(&self, name: &str) -> gtk::Widget {
-        let name = name.split('_').next().unwrap_or(name);
-        match name {
-            "separator" => separator::render(&self.user_config),
-            "workspaces" => self.widgets.workspaces.widget().clone().into(),
-            "clock" => self.widgets.clock.clone(),
-            "title" => self.widgets.title.widget().clone(),
-            "shutdown" => {
+    pub fn build_widget(&self, widget: BarWidget) -> gtk::Widget {
+        match widget {
+            BarWidget::Separator => separator::render(&self.user_config),
+            BarWidget::Workspaces => self.widgets.workspaces.widget().clone().into(),
+            BarWidget::Time => self.widgets.clock.clone(),
+            BarWidget::AppTitle => self.widgets.title.widget().clone(),
+            BarWidget::Shutdown => {
                 let button = gtk::Button::from_icon_name("system-shutdown");
                 let label = gtk::Label::new(Some("Shutdown"));
 
@@ -80,7 +81,7 @@ impl WidgetsBuilder {
                 button.add_css_class("shutdown-button");
                 button.into()
             }
-            "player" => {
+            BarWidget::Playback => {
                 let (window, status) = panels::player::build_ui();
                 let button = gtk::Button::with_label("💤 No activity");
                 let button_clone = button.clone();
@@ -103,7 +104,7 @@ impl WidgetsBuilder {
 
                 button.into()
             }
-            "apps" => {
+            BarWidget::Apps => {
                 let container = &self.widgets.apps;
                 container.add_css_class("apps-container");
 
@@ -115,12 +116,12 @@ impl WidgetsBuilder {
                     .cloned()
                     .unwrap_or_default()
                 {
-                    self.create_widget_app(app, "", false);
+                    self.create_widget_app(app, false);
                 }
                 container.clone()
             }
-            "settings" => {
-                let settings_button = gtk::Button::with_label("");
+            BarWidget::Settings => {
+                let settings_button = gtk::Button::with_label("󰕴");
                 settings_button.add_css_class("settings-button");
 
                 let settings = panels::settings::SettingsPanel::new(self.sender.clone());
@@ -133,8 +134,8 @@ impl WidgetsBuilder {
 
                 settings_button.into()
             }
-            _ => {
-                let button = self.user_config.custom_apps.get(name);
+            BarWidget::Custom(name) => {
+                let button = self.user_config.custom_apps.get(name.as_str());
                 if let Some(button) = button {
                     let btn = match button.icon.as_deref() {
                         Some(icon_name) => gtk::Button::with_label(icon_name),
@@ -196,12 +197,18 @@ impl WidgetsBuilder {
             if item == "workspaces" {
                 has_workspace = true;
             }
+            let bar_widget = item
+                .split('_')
+                .next()
+                .unwrap_or(item)
+                .parse::<BarWidget>()
+                .unwrap_or(BarWidget::Custom(item.to_string()));
 
             let widget = self
                 .widgets_cache
                 .borrow_mut()
                 .entry(item.to_string())
-                .or_insert_with(|| self.build_widget(item))
+                .or_insert_with(|| self.build_widget(bar_widget))
                 .clone();
             if let Some(parent) = widget.parent()
                 && parent != **container
@@ -241,16 +248,12 @@ impl WidgetsBuilder {
         self.user_config = user_config;
     }
 
-    pub fn create_widget_app(&self, app_name: &str, id: &str, is_opened: bool) {
-        let button = gtk::Button::from_icon_name(app_name);
+    pub fn create_widget_app(&self, app_name: &str, is_opened: bool) {
+        let button = gtk::Button::new();
         button.set_cursor(Cursor::from_name("pointer", None).as_ref());
         button.set_tooltip_text(Some(app_name));
         button.set_widget_name(app_name);
         button.add_css_class("app-button");
-
-        if is_opened {
-            button.add_css_class("opened");
-        }
 
         let clients = self.active_clients.borrow();
         let app_clients_active = clients
@@ -259,51 +262,46 @@ impl WidgetsBuilder {
 
         let has_active_client = app_clients_active.clone().count() >= 1;
 
-        if !id.is_empty() {
-            button.set_widget_name(format!("{}_{}", app_name, id).as_str());
-        } else if has_active_client {
+        if has_active_client || is_opened {
             button.add_css_class("opened");
-            let mut widget_name = app_name.to_string();
-            for client in app_clients_active {
-                widget_name.push_str(format!("_{}", &client.address.replace("0x", "")).as_str());
-            }
-            button.set_widget_name(widget_name.as_str());
         }
-
-        let icon_theme = gtk::IconTheme::for_display(&gtk::gdk::Display::default().unwrap());
-        let found_icon = icon_theme.has_icon(app_name);
 
         let mut exec = None;
-        if !found_icon {
-            use crate::utils::search::search_desktop_file;
-            let icon_name = if let Some(desktop_file) = search_desktop_file(app_name) {
-                exec = Some(desktop_file.exec.clone());
-                desktop_file
-                    .icon
-                    .unwrap_or_else(|| "application-x-executable".to_string())
-            } else {
-                "application-x-executable".to_string()
-            };
-            button.set_child(Some(&self.load_icon(&icon_name, 16)));
-        }
+        use crate::utils::search::search_desktop_file;
+        let icon_name = if let Some(desktop_file) = search_desktop_file(app_name) {
+            exec = Some(desktop_file.exec.clone());
+            desktop_file
+                .icon
+                .unwrap_or_else(|| "application-x-executable".to_string())
+        } else {
+            "application-x-executable".to_string()
+        };
+        button.set_child(Some(&self.load_icon(&icon_name, 20)));
 
         let app_clone = app_name.to_string();
         let app_clients = Rc::clone(&self.active_clients);
 
-        button.connect_clicked(move |_| {
-            let exec_cmd = exec.clone().unwrap_or(app_clone.clone());
-            let clients = app_clients.borrow();
-            let mut iter = clients
-                .iter()
-                .filter(|c| c.class.to_lowercase().contains(&app_clone.to_lowercase()));
+        let gesture = GestureClick::new();
+        gesture.set_propagation_phase(gtk::PropagationPhase::Capture);
+        gesture.connect_pressed(move |gesture, _, _, _| match gesture.current_button() {
+            1 => {
+                let exec_cmd = exec.clone().unwrap_or(app_clone.clone());
+                let clients = app_clients.borrow();
+                let mut iter = clients
+                    .iter()
+                    .filter(|c| c.class.to_lowercase().contains(&app_clone.to_lowercase()));
 
-            match (iter.next(), iter.next()) {
-                // temporary solution for multiple clients, should be improved in the future
-                (Some(client), Some(_)) => focus_client(client),
-                (Some(client), None) => focus_client(client),
-                (None, _) => app_lauch(&exec_cmd),
+                match (iter.next(), iter.next()) {
+                    (Some(client), Some(_)) => focus_client(client),
+                    (Some(client), None) => focus_client(client),
+                    (None, _) => app_lauch(&exec_cmd),
+                }
             }
+            2 => {}
+            _ => println!("Other mouse button pressed"),
         });
+
+        button.add_controller(gesture);
 
         self.widgets
             .apps
@@ -317,8 +315,20 @@ impl WidgetsBuilder {
         *self.active_clients.borrow_mut() = clients::active_clients().unwrap_or_default();
     }
 
+    pub fn get_active_clients(&self) -> Vec<Client> {
+        self.active_clients.borrow().clone()
+    }
+
+    pub fn remove_widget_app(&self, widget: &gtk::Widget) {
+        self.widgets
+            .apps
+            .clone()
+            .downcast::<gtk::Box>()
+            .unwrap()
+            .remove(widget);
+    }
+
     pub fn load_icon(&self, icon_name: &str, size: i32) -> Image {
-        println!("Loading icon: {}", icon_name);
         let image = if icon_name.contains('/')
             || icon_name.ends_with(".png")
             || icon_name.ends_with(".svg")

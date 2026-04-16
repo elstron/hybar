@@ -3,10 +3,11 @@ use glib::ControlFlow;
 use gtk::{Button, prelude::*};
 use std::{cell::Cell, rc::Rc};
 
-use crate::hybar::set_popover;
+use crate::bar::set_popover;
 
 pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
-    let clock_label = gtk::Label::new(Some(Local::now().format("%I:%M %P").to_string().as_str()));
+    let fomat = "%I:%M %P\n%d/%m/%Y";
+    let clock_label = gtk::Label::new(Some(Local::now().format(fomat).to_string().as_str()));
 
     let clock_container = Button::builder()
         .halign(gtk::Align::Center)
@@ -22,7 +23,7 @@ pub fn render(is_visible: &Rc<Cell<bool>>) -> gtk::Widget {
         move || {
             if is_visible.get() {
                 let now = chrono::Local::now();
-                clock_label.set_label(&now.format("%I:%M %P").to_string());
+                clock_label.set_label(&now.format(fomat).to_string());
             }
             ControlFlow::Continue
         }

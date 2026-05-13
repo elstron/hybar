@@ -6,34 +6,24 @@ use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 use crate::enums::preferences::{BarLayout, BarPosition};
 
-pub fn layer_shell_configure(window: &ApplicationWindow, position: &str) {
+pub fn layer_shell_configure(window: &ApplicationWindow) {
     LayerShell::init_layer_shell(window);
     window.set_layer(Layer::Overlay);
     window.set_namespace(Some("hybar:main"));
 
     window.auto_exclusive_zone_enable();
 
-    set_position(
-        window,
-        position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
-    );
-
     window.set_visible(false);
     window.add_css_class("top-bar");
 }
 
-pub fn hidden_layer_configuration(window: &ApplicationWindow, position: &str) {
+pub fn hidden_layer_configuration(window: &ApplicationWindow) {
     LayerShell::init_layer_shell(window);
     window.set_layer(Layer::Overlay);
     window.set_keyboard_mode(KeyboardMode::OnDemand);
     window.set_focusable(true);
     window.auto_exclusive_zone_enable();
     window.set_namespace(Some("hybar:hidden"));
-
-    set_position(
-        window,
-        position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
-    );
 
     window.set_visible(false);
     window.add_css_class("hidden-bar");

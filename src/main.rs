@@ -32,6 +32,7 @@ pub enum PreferencesEvent {
     ThemeChanged(String),
     AutohideChanged(bool),
     BarPositionChanged(String),
+    BarHeightChanged(i32),
 }
 
 pub struct EventState {

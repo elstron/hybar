@@ -32,6 +32,7 @@ pub struct Hybar {
 #[derive(Clone)]
 pub struct BarPreferences {
     pub autohide: bool,
+    pub height: i32,
     pub theme: String,
     pub bar_position: String,
     pub favorites: Vec<String>,
@@ -45,6 +46,7 @@ impl Default for BarPreferences {
             autohide: config.bar.autohide,
             theme: config.theme.clone(),
             bar_position: config.bar.position.clone(),
+            height: config.bar.height as i32,
             favorites: config.widgets.get("apps").map_or(Vec::new(), |app_config| {
                 app_config.favorites.clone().unwrap_or_default()
             }),
@@ -58,6 +60,8 @@ impl Hybar {
         let preferences = Rc::new(RefCell::new(BarPreferences::default()));
         let bar_window = BarWindows::new(app);
         bar_window.set_bar_position(&preferences.borrow().bar_position);
+        bar_window.set_bar_height(preferences.borrow().height);
+
         let hidden_window = bar_window.main.clone();
         Self {
             window: bar_window,

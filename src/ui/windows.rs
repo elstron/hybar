@@ -30,10 +30,9 @@ impl BarWindows {
 
     fn main_window_settings(&self) {
         self.main.set_title(Some("hybar"));
-        self.main.set_default_height(40);
         LayerShell::init_layer_shell(&self.main);
 
-        layer_shell_configure(&self.main, "top");
+        layer_shell_configure(&self.main);
     }
 
     fn hidden_window_settings(&self) {
@@ -41,7 +40,7 @@ impl BarWindows {
         self.hidden.set_default_height(2);
         LayerShell::init_layer_shell(&self.hidden);
 
-        hidden_layer_configuration(&self.hidden, "top");
+        hidden_layer_configuration(&self.hidden);
     }
 
     pub fn handle_fullscreen(&self, is_window_visible: Rc<Cell<bool>>, is_fullscreen: bool) {
@@ -77,6 +76,10 @@ impl BarWindows {
             &self.hidden,
             position.parse::<BarPosition>().unwrap_or(BarPosition::Top),
         );
+    }
+
+    pub fn set_bar_height(&self, height: i32) {
+        self.main.set_default_height(height);
     }
 
     #[allow(dead_code)]
